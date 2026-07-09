@@ -135,6 +135,11 @@ table.rank tr.me{background:#fff8e6}
 #levelup{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:80;background:rgba(10,15,40,.6);pointer-events:none}
 #levelup.show{display:flex}
 #levelup .box{background:var(--gold);color:#5a3d00;font-family:'Jua';font-size:1.6rem;padding:26px 44px;border-radius:24px;box-shadow:0 0 60px rgba(255,209,102,.9);animation:pop .5s;text-align:center}
+.idrow{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.idrow input,.idrow select{font-size:1rem;padding:10px 6px;border-radius:12px;border:none;text-align:center;font-family:'Jua';width:100%}
+.tfilter{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 12px}
+.tfilter input,.tfilter select{font-size:.95rem;padding:8px 10px;border-radius:10px;border:2px solid #dfe3f0;font-family:'Gowun Dodum'}
+#tf-school{width:150px} #tf-class{width:70px}
 /* ---------- TEACHER ---------- */
 .tsum{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px}
 .tsum .tcard{background:#f0f4ff;border-radius:14px;padding:10px 18px;text-align:center;flex:1;min-width:110px}
@@ -173,6 +178,13 @@ table.rank tr.clickable:hover{background:#f0faf8}
   <h1>🌍 세계 나라 대탐험</h1>
   <div class="sub">지도 위를 모험하며 세계 여러 나라를 알아가는 탐험 게임!</div>
   <div class="login-card">
+    <div class="jua" style="color:#fff;font-size:1.1rem;margin-bottom:10px">우리 학교와 학급을 알려 주세요</div>
+    <div class="idrow">
+      <input id="in-school" maxlength="15" placeholder="학교 이름">
+      <select id="in-grade"><option value="">학년</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option></select>
+      <input id="in-class" type="number" min="1" max="30" placeholder="반">
+      <input id="in-num" type="number" min="1" max="50" placeholder="번호">
+    </div>
     <div class="jua" style="color:#fff;font-size:1.1rem;margin-bottom:10px">탐험가 이름(닉네임)을 정해 주세요</div>
     <input id="nickname" maxlength="10" placeholder="예) 번개탐험가">
     <div class="jua" style="color:#fff;font-size:1rem;margin-bottom:8px">캐릭터 고르기</div>
@@ -259,14 +271,21 @@ table.rank tr.clickable:hover{background:#f0faf8}
 <div class="screen" id="screen-teacher">
   <div class="back-row">
     <button class="btn ghost small" onclick="showScreen('login')">← 처음으로</button>
-    <button class="btn ghost small" onclick="openTeacher()">🔄 새로고침</button>
+    <button class="btn ghost small" onclick="teacherLoad()">🔄 새로고침</button>
     <button class="btn ghost small" onclick="teacherCSV()">⬇️ CSV로 저장</button>
   </div>
   <div class="panel">
     <h2>👩‍🏫 교사용 학급 현황판</h2>
+    <div class="tfilter">
+      <input id="tf-school" placeholder="학교 이름">
+      <select id="tf-grade"><option value="">학년</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option></select>
+      <input id="tf-class" type="number" min="1" max="30" placeholder="반">
+      <button class="btn teal small" onclick="teacherLoad()">우리 반 조회 🔍</button>
+      <span id="tf-info" style="font-size:.9rem;color:#1a2a6c;font-family:'Jua'"></span>
+    </div>
     <div class="tsum" id="teacher-summary"></div>
     <table class="rank">
-      <thead><tr><th>순</th><th>학생</th><th>레벨</th><th>XP</th><th>탐험 국가</th><th>배지</th><th>일지 수</th><th>최근 활동</th></tr></thead>
+      <thead><tr><th>번호</th><th>학생</th><th>레벨</th><th>XP</th><th>탐험 국가</th><th>배지</th><th>일지 수</th><th>최근 활동</th></tr></thead>
       <tbody id="teacher-body"><tr><td colspan="8">불러오는 중...</td></tr></tbody>
     </table>
     <div style="color:#888;font-size:.85rem;margin-top:8px">학생 줄을 클릭하면 탐험한 나라와 일지 전체 내용을 볼 수 있어요.</div>
@@ -453,6 +472,7 @@ async function initFirebase(){
       P = Object.assign(P, d);
       document.getElementById('nickname').value = P.nickname||'';
       if(P.avatar) selectAvatar(P.avatar);
+      fillIdFields();
       setStatus(`어서 와요, ${P.nickname||'탐험가'}님! 이어서 모험할 수 있어요. ✅`);
     }
   }catch(e){
@@ -497,6 +517,8 @@ function saveProfile(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(async ()=>{
     const data = {nickname:P.nickname, avatar:P.avatar, xp:P.xp, level:levelOf(P.xp),
+      school:P.school||'', grade:P.grade||'', classNo:P.classNo||'', studentNo:P.studentNo||'',
+      classKey:P.classKey||'',
       explored:P.explored, badges:P.badges, exploredCount:Object.keys(P.explored).length,
       updatedAt:Date.now()};
     if(USE_FIREBASE && uid){
@@ -513,6 +535,7 @@ function loadLocal(){
     if(raw){ P=Object.assign(P, JSON.parse(raw));
       document.getElementById('nickname').value=P.nickname||'';
       if(P.avatar) selectAvatar(P.avatar);
+      fillIdFields();
     }
   }catch(e){}
 }
@@ -550,8 +573,16 @@ function buildAvatars(){
   row.innerHTML=AVATARS.map(a=>`<div class="avatar-pick${a===selAvatar?' sel':''}" onclick="selectAvatar('${a}')">${a}</div>`).join('');
 }
 function startAdventure(){
+  const sc=document.getElementById('in-school').value.trim();
+  const gr=document.getElementById('in-grade').value;
+  const cl=document.getElementById('in-class').value.trim();
+  const no=document.getElementById('in-num').value.trim();
   const nick=document.getElementById('nickname').value.trim();
+  if(!sc||!gr||!cl){ toast('학교 이름, 학년, 반을 입력해 주세요! 🏫'); return; }
+  if(!no){ toast('출석 번호를 입력해 주세요! 🔢'); return; }
   if(!nick){ toast('탐험가 이름을 입력해 주세요! ✏️'); return; }
+  P.school=sc; P.grade=gr; P.classNo=cl; P.studentNo=parseInt(no)||no;
+  P.classKey=sc+'|'+gr+'|'+cl;
   P.nickname=nick; P.avatar=selAvatar;
   saveProfile();
   document.getElementById('hud').classList.add('show');
@@ -784,7 +815,7 @@ function openPassport(){
   updateHUD();
   const n=Object.keys(P.explored).length;
   document.getElementById('pass-summary').textContent=
-    `${P.avatar} ${P.nickname} · Lv.${levelOf(P.xp)} ${titleOf(levelOf(P.xp))} · 총 ${P.xp} XP · ${n}/${COUNTRIES.length}개국 탐험`;
+    `${P.school?P.school+" "+P.grade+"학년 "+P.classNo+"반 "+(P.studentNo?P.studentNo+"번":"")+" · ":""}${P.avatar} ${P.nickname} · Lv.${levelOf(P.xp)} ${titleOf(levelOf(P.xp))} · 총 ${P.xp} XP · ${n}/${COUNTRIES.length}개국 탐험`;
   const shelf=document.getElementById('badge-shelf');
   shelf.innerHTML=allBadgeDefs().map(b=>`<div class="badge-item${P.badges.includes(b.id)?' earned':''}"><div class="ic">${b.ic}</div><div class="lb">${b.lb}</div></div>`).join('');
   const list=document.getElementById('pass-list');
@@ -806,11 +837,15 @@ async function openRank(){
   }
   body.innerHTML='<tr><td colspan="5">불러오는 중...</td></tr>';
   try{
-    const q=fb.query(fb.collection(db,'students'), fb.orderBy('xp','desc'), fb.limit(10));
+    let q;
+    if(P.classKey) q=fb.query(fb.collection(db,'students'), fb.where('classKey','==',P.classKey));
+    else q=fb.query(fb.collection(db,'students'), fb.orderBy('xp','desc'), fb.limit(10));
     const snap=await fb.getDocs(q);
+    let docs=[]; snap.forEach(d=>docs.push({id:d.id, data:d.data()}));
+    docs.sort((a,b)=>(b.data.xp||0)-(a.data.xp||0)); docs=docs.slice(0,10);
     let rows='', rank=1;
-    snap.forEach(docu=>{
-      const d=docu.data();
+    docs.forEach(docu=>{
+      const d=docu.data;
       const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
       rows+=`<tr${docu.id===uid?' class="me"':''}><td>${medal}</td><td>${d.avatar||'🧭'} ${d.nickname||'?'}</td><td>Lv.${d.level||1}</td><td>${d.xp||0}</td><td>${d.exploredCount||0}</td></tr>`;
       rank++;
@@ -838,22 +873,36 @@ function teacherLogin(){
 async function openTeacher(){
   showScreen('teacher');
   document.getElementById('hud').classList.remove('show');
+  TEACHER_CACHE=[];
+  document.getElementById('teacher-summary').innerHTML='';
+  document.getElementById('teacher-body').innerHTML='<tr><td colspan="8">위에서 학교 이름·학년·반을 입력하고 [우리 반 조회]를 눌러 주세요.</td></tr>';
+}
+async function teacherLoad(){
+  const sc=document.getElementById('tf-school').value.trim();
+  const gr=document.getElementById('tf-grade').value;
+  const cl=document.getElementById('tf-class').value.trim();
+  if(!sc||!gr||!cl){ toast('학교 이름, 학년, 반을 모두 입력해 주세요!'); return; }
+  const key=sc+'|'+gr+'|'+cl;
   const body=document.getElementById('teacher-body');
   body.innerHTML='<tr><td colspan="8">불러오는 중...</td></tr>';
+  document.getElementById('tf-info').textContent='';
   let students=[];
   if(USE_FIREBASE && db){
     try{
-      const snap=await fb.getDocs(fb.collection(db,'students'));
+      const q=fb.query(fb.collection(db,'students'), fb.where('classKey','==',key));
+      const snap=await fb.getDocs(q);
       snap.forEach(d=>students.push(Object.assign({_id:d.id}, d.data())));
     }catch(e){
       body.innerHTML='<tr><td colspan="8">불러오기 실패: 인터넷 연결과 Firestore 규칙을 확인하세요.</td></tr>';
       return;
     }
-  }else if(P.nickname){
-    students=[{_id:'local', nickname:P.nickname, avatar:P.avatar, xp:P.xp, level:levelOf(P.xp),
+  }else if(P.nickname && P.classKey===key){
+    students=[{_id:'local', school:P.school, grade:P.grade, classNo:P.classNo, studentNo:P.studentNo,
+      nickname:P.nickname, avatar:P.avatar, xp:P.xp, level:levelOf(P.xp),
       explored:P.explored, badges:P.badges, updatedAt:Date.now()}];
   }
-  TEACHER_CACHE=students.sort((a,b)=>(b.xp||0)-(a.xp||0));
+  document.getElementById('tf-info').textContent=sc+' '+gr+'학년 '+cl+'반 · '+students.length+'명';
+  TEACHER_CACHE=students.sort((a,b)=>(parseInt(a.studentNo)||999)-(parseInt(b.studentNo)||999));
   renderTeacher();
   if(!USE_FIREBASE) toast('연습 모드: 이 컴퓨터의 기록만 보여요. Firebase 연결 시 반 전체가 나타나요.');
 }
@@ -877,9 +926,8 @@ function renderTeacher(){
   const body=document.getElementById('teacher-body');
   if(!st.length){ body.innerHTML='<tr><td colspan="8">아직 참여한 학생이 없어요.</td></tr>'; return; }
   body.innerHTML=st.map((s,i)=>{
-    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
     return `<tr class="clickable" onclick="teacherDetail(${i})">
-      <td>${medal}</td><td>${s.avatar||'🧭'} ${s.nickname||'?'}</td>
+      <td>${s.studentNo?s.studentNo+'번':'-'}</td><td>${s.avatar||'🧭'} ${s.nickname||'?'}</td>
       <td>Lv.${s.level||levelOf(s.xp||0)}</td><td>${s.xp||0}</td>
       <td>${Object.keys(s.explored||{}).length}개국</td>
       <td>${(s.badges||[]).length}개</td><td>${noteCount(s)}개</td>
@@ -890,7 +938,7 @@ function teacherDetail(i){
   const s=TEACHER_CACHE[i]; if(!s) return;
   document.getElementById('ts-name').textContent=(s.avatar||'🧭')+' '+(s.nickname||'?');
   document.getElementById('ts-meta').textContent=
-    `Lv.${s.level||levelOf(s.xp||0)} · ${s.xp||0} XP · ${Object.keys(s.explored||{}).length}개국 탐험 · 일지 ${noteCount(s)}개 · 최근 활동 ${fmtTime(s.updatedAt)}`;
+    `${s.school||""} ${s.grade||""}학년 ${s.classNo||""}반 ${s.studentNo?s.studentNo+"번":""} · Lv.${s.level||levelOf(s.xp||0)} · ${s.xp||0} XP · ${Object.keys(s.explored||{}).length}개국 탐험 · 일지 ${noteCount(s)}개 · 최근 활동 ${fmtTime(s.updatedAt)}`;
   const det=document.getElementById('ts-detail');
   const ex=s.explored||{};
   let html='';
@@ -909,9 +957,9 @@ function teacherDetail(i){
   document.getElementById('modal-student').classList.add('show');
 }
 function teacherCSV(){
-  const rows=[['닉네임','레벨','XP','탐험 국가 수','배지 수','일지 수','대륙','나라','탐험 일지','기록 시각']];
+  const rows=[['학교','학년','반','번호','닉네임','레벨','XP','탐험 국가 수','배지 수','일지 수','대륙','나라','탐험 일지','기록 시각']];
   for(const s of TEACHER_CACHE){
-    const base=[s.nickname||'?', s.level||levelOf(s.xp||0), s.xp||0,
+    const base=[s.school||'', s.grade||'', s.classNo||'', s.studentNo||'', s.nickname||'?', s.level||levelOf(s.xp||0), s.xp||0,
       Object.keys(s.explored||{}).length, (s.badges||[]).length, noteCount(s)];
     const ex=s.explored||{};
     const ids=Object.keys(ex);
@@ -929,7 +977,15 @@ function teacherCSV(){
   a.click();
 }
 window.teacherLogin=teacherLogin; window.openTeacher=openTeacher;
-window.teacherDetail=teacherDetail; window.teacherCSV=teacherCSV;
+window.teacherDetail=teacherDetail; window.teacherCSV=teacherCSV; window.teacherLoad=teacherLoad;
+function fillIdFields(){
+  try{
+    if(P.school) document.getElementById('in-school').value=P.school;
+    if(P.grade) document.getElementById('in-grade').value=P.grade;
+    if(P.classNo) document.getElementById('in-class').value=P.classNo;
+    if(P.studentNo) document.getElementById('in-num').value=P.studentNo;
+  }catch(e){}
+}
 
 
 buildAvatars();

@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌍 세계 나라 대탐험</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson-client/3.1.0/topojson-client.min.js"></script>
+<style>
+:root{
+  --bg1:#1a2a6c; --bg2:#2a4d8f; --card:#ffffff; --ink:#2d3142;
+  --accent:#ff9f1c; --accent2:#2ec4b6; --wrong:#e63946; --right:#43aa8b;
+  --gold:#ffd166;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Gowun Dodum',sans-serif;background:linear-gradient(160deg,var(--bg1),var(--bg2) 60%,#3a6ea5);min-height:100vh;color:var(--ink)}
+h1,h2,h3,.jua{font-family:'Jua',sans-serif}
+.screen{display:none;max-width:1100px;margin:0 auto;padding:16px}
+.screen.active{display:block;animation:fadein .4s}
+@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+button{font-family:'Jua',sans-serif;border:none;cursor:pointer;border-radius:14px;transition:transform .12s, box-shadow .12s}
+button:active{transform:scale(.96)}
+.btn{background:var(--accent);color:#fff;font-size:1.1rem;padding:12px 28px;box-shadow:0 4px 0 #d67f00}
+.btn:hover{transform:translateY(-2px)}
+.btn.teal{background:var(--accent2);box-shadow:0 4px 0 #1d9c8f}
+.btn.ghost{background:rgba(255,255,255,.15);color:#fff;box-shadow:none;border:2px solid rgba(255,255,255,.4)}
+.btn.small{font-size:.95rem;padding:8px 16px}
+/* ---------- HUD ---------- */
+#hud{display:none;max-width:1100px;margin:0 auto;padding:12px 16px 0;align-items:center;gap:12px;flex-wrap:wrap}
+#hud.show{display:flex}
+.hud-card{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:16px;padding:8px 14px;color:#fff;display:flex;align-items:center;gap:8px;backdrop-filter:blur(4px)}
+#hud-avatar{font-size:1.6rem}
+#hud-name{font-family:'Jua';font-size:1.05rem}
+#hud-title{font-size:.8rem;color:var(--gold)}
+.xpbar{width:150px;height:12px;background:rgba(0,0,0,.35);border-radius:8px;overflow:hidden}
+.xpbar>div{height:100%;background:linear-gradient(90deg,var(--gold),var(--accent));width:0%;transition:width .6s}
+#hud-right{margin-left:auto;display:flex;gap:8px}
+/* ---------- LOGIN ---------- */
+#screen-login{max-width:520px;text-align:center;padding-top:6vh;color:#fff}
+#screen-login h1{font-size:2.4rem;text-shadow:0 3px 8px rgba(0,0,0,.35);margin-bottom:6px}
+#screen-login .sub{opacity:.9;margin-bottom:26px}
+.login-card{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:24px;padding:28px;backdrop-filter:blur(6px)}
+#nickname{width:100%;font-size:1.2rem;padding:12px 16px;border-radius:14px;border:none;text-align:center;font-family:'Jua';margin-bottom:16px}
+.avatars{display:flex;justify-content:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.avatar-pick{font-size:1.9rem;background:rgba(255,255,255,.15);border-radius:50%;width:56px;height:56px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:3px solid transparent;transition:all .15s}
+.avatar-pick:hover{transform:scale(1.12)}
+.avatar-pick.sel{border-color:var(--gold);background:rgba(255,209,102,.3);transform:scale(1.12)}
+#login-status{margin-top:14px;font-size:.85rem;opacity:.85;min-height:1.2em}
+/* ---------- HOME ---------- */
+#screen-home h2{color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.3);margin:10px 0 16px;font-size:1.7rem}
+.continent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.cont-card{background:var(--card);border-radius:20px;padding:18px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:transform .15s;position:relative;overflow:hidden}
+.cont-card:hover{transform:translateY(-4px)}
+.cont-card .emoji{font-size:2.2rem}
+.cont-card h3{font-size:1.3rem;margin:6px 0 2px}
+.cont-card .cnt{font-size:.85rem;color:#666}
+.cont-progress{height:10px;background:#eee;border-radius:6px;margin-top:10px;overflow:hidden}
+.cont-progress>div{height:100%;background:linear-gradient(90deg,var(--accent2),#5fd6c9);transition:width .5s}
+.cont-badge{position:absolute;top:14px;right:14px;font-size:1.6rem;filter:grayscale(1);opacity:.35}
+.cont-badge.earned{filter:none;opacity:1;animation:pop .4s}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+.home-actions{display:flex;gap:10px;margin:18px 0;flex-wrap:wrap}
+/* ---------- STAGE (tier select) ---------- */
+.tier-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px}
+.tier-card{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 5px 14px rgba(0,0,0,.22)}
+.tier-card.locked{opacity:.55;filter:grayscale(.6)}
+.tier-card h3{font-size:1.15rem}
+.tier-card .desc{font-size:.85rem;color:#666;margin:4px 0 10px}
+.chip{display:inline-block;background:#f0f4ff;color:#4a5aa8;font-size:.75rem;border-radius:8px;padding:3px 8px;margin:2px}
+.chip.done{background:#e3f7f1;color:#2a8d75;text-decoration:line-through}
+/* ---------- QUIZ ---------- */
+#quiz-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:#fff;margin-bottom:10px}
+#quiz-question{background:var(--card);color:var(--ink);border-radius:16px;padding:12px 20px;font-family:'Jua';font-size:1.25rem;box-shadow:0 4px 12px rgba(0,0,0,.25);flex:1;min-width:260px}
+#quiz-question b{color:var(--accent);font-size:1.4rem}
+#hearts{font-size:1.4rem;letter-spacing:2px}
+#map-wrap{background:#bfe3f2;border-radius:20px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.3);position:relative}
+#map-wrap svg{display:block;width:100%;height:auto}
+.country{fill:#e8e2d0;stroke:#9db4c0;stroke-width:.5;cursor:pointer;transition:fill .15s}
+.country.in-cont{fill:#f7edd3}
+.country.in-cont:hover{fill:var(--gold)}
+.country.dim{cursor:default;fill:#d5d9dd}
+.country.correct{fill:var(--right);animation:blink .5s 3}
+.country.wrongpick{fill:var(--wrong)}
+.country.explored-mark{fill:#bfe0b8}
+@keyframes blink{50%{fill:#7fe0c3}}
+.tiny-target{fill:rgba(255,159,28,.001);stroke:rgba(255,159,28,.65);stroke-width:1.2;stroke-dasharray:3 3;cursor:pointer}
+#quiz-feedback{min-height:2em;color:#fff;font-family:'Jua';font-size:1.05rem;margin-top:10px;text-align:center;text-shadow:0 2px 4px rgba(0,0,0,.4)}
+#quiz-hint{color:var(--gold);font-size:.95rem;text-align:center;margin-top:4px;min-height:1.4em}
+/* ---------- INFO MODAL ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(10,15,40,.7);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal-bg.show{display:flex;animation:fadein .3s}
+.modal{background:var(--card);border-radius:24px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:24px}
+.modal .flagline{font-size:2rem}
+.modal h2{font-size:1.6rem;margin:4px 0 2px}
+.modal .en{color:#888;font-size:.9rem;margin-bottom:10px}
+.xp-gain{display:inline-block;background:var(--gold);color:#7a5200;font-family:'Jua';border-radius:10px;padding:4px 12px;margin:6px 0;animation:pop .5s}
+.tabs{display:flex;gap:6px;margin:12px 0}
+.tab{flex:1;background:#f0f0f5;border-radius:10px;padding:8px;font-size:.95rem;color:#555}
+.tab.on{background:var(--accent2);color:#fff}
+.tabpanel{background:#f8f9fc;border-radius:14px;padding:14px;font-size:.95rem;line-height:1.7;min-height:120px}
+.tabpanel dt{font-family:'Jua';color:#4a5aa8;margin-top:8px}
+.tabpanel dt:first-child{margin-top:0}
+.note-area{margin-top:14px}
+.note-area textarea{width:100%;border:2px solid #dfe3f0;border-radius:12px;padding:10px;font-family:'Gowun Dodum';font-size:.95rem;resize:vertical;min-height:64px}
+.modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end}
+/* ---------- PASSPORT / RANK ---------- */
+.panel{background:var(--card);border-radius:20px;padding:20px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.pass-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:12px}
+.pass-item{background:#f8f9fc;border-radius:14px;padding:12px;cursor:pointer;border:2px solid transparent}
+.pass-item:hover{border-color:var(--accent2)}
+.pass-item .nm{font-family:'Jua';font-size:1.05rem}
+.pass-item .nt{font-size:.8rem;color:#777;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge-shelf{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0}
+.badge-item{text-align:center;width:86px}
+.badge-item .ic{font-size:2.4rem;filter:grayscale(1);opacity:.3}
+.badge-item.earned .ic{filter:none;opacity:1}
+.badge-item .lb{font-size:.72rem;color:#666;margin-top:2px}
+table.rank{width:100%;border-collapse:collapse;margin-top:10px}
+table.rank td,table.rank th{padding:8px 10px;text-align:left;border-bottom:1px solid #eee;font-size:.95rem}
+table.rank tr.me{background:#fff8e6}
+.back-row{margin:12px 0}
+/* toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(20,25,50,.92);color:#fff;padding:12px 22px;border-radius:14px;font-family:'Jua';display:none;z-index:99;text-align:center}
+#toast.show{display:block;animation:fadein .3s}
+/* level-up overlay */
+#levelup{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:80;background:rgba(10,15,40,.6);pointer-events:none}
+#levelup.show{display:flex}
+#levelup .box{background:var(--gold);color:#5a3d00;font-family:'Jua';font-size:1.6rem;padding:26px 44px;border-radius:24px;box-shadow:0 0 60px rgba(255,209,102,.9);animation:pop .5s;text-align:center}
+@media(max-width:640px){ .xpbar{width:90px} #screen-login h1{font-size:1.8rem} }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="hud-card"><span id="hud-avatar">🧭</span>
+    <div><div id="hud-name">-</div><div id="hud-title">새싹 탐험가</div></div>
+  </div>
+  <div class="hud-card"><span class="jua" id="hud-level">Lv.1</span>
+    <div class="xpbar"><div id="hud-xpfill"></div></div><span id="hud-xp" style="font-size:.8rem">0 XP</span>
+  </div>
+  <div class="hud-card">🗺️ <span id="hud-explored" class="jua">0</span>개국 탐험</div>
+  <div id="hud-right">
+    <button class="btn ghost small" onclick="showScreen('home')">🏠 홈</button>
+    <button class="btn ghost small" onclick="openPassport()">📔 탐험 여권</button>
+    <button class="btn ghost small" onclick="openRank()">🏆 랭킹</button>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen active" id="screen-login">
+  <h1>🌍 세계 나라 대탐험</h1>
+  <div class="sub">지도 위를 모험하며 세계 여러 나라를 알아가는 탐험 게임!</div>
+  <div class="login-card">
+    <div class="jua" style="color:#fff;font-size:1.1rem;margin-bottom:10px">탐험가 이름(닉네임)을 정해 주세요</div>
+    <input id="nickname" maxlength="10" placeholder="예) 번개탐험가">
+    <div class="jua" style="color:#fff;font-size:1rem;margin-bottom:8px">캐릭터 고르기</div>
+    <div class="avatars" id="avatar-row"></div>
+    <button class="btn" onclick="startAdventure()">모험 시작! 🚀</button>
+    <div id="login-status"></div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="screen" id="screen-home">
+  <h2>🗺️ 어느 대륙으로 떠나 볼까요?</h2>
+  <div class="continent-grid" id="continent-grid"></div>
+</div>
+
+<!-- TIER SELECT -->
+<div class="screen" id="screen-stage">
+  <div class="back-row"><button class="btn ghost small" onclick="showScreen('home')">← 대륙 선택으로</button></div>
+  <h2 id="stage-title" style="color:#fff;font-size:1.6rem;margin-bottom:4px"></h2>
+  <div class="tier-row" id="tier-row"></div>
+</div>
+
+<!-- QUIZ -->
+<div class="screen" id="screen-quiz">
+  <div id="quiz-top">
+    <button class="btn ghost small" onclick="exitQuiz()">← 그만하기</button>
+    <div id="quiz-question">문제</div>
+    <div class="hud-card">❤️ <span id="hearts">❤️❤️❤️</span></div>
+    <div class="hud-card">📍 <span id="quiz-progress" class="jua">1/8</span></div>
+  </div>
+  <div id="map-wrap"></div>
+  <div id="quiz-feedback"></div>
+  <div id="quiz-hint"></div>
+</div>
+
+<!-- PASSPORT -->
+<div class="screen" id="screen-passport">
+  <div class="back-row"><button class="btn ghost small" onclick="showScreen('home')">← 홈으로</button></div>
+  <div class="panel">
+    <h2>📔 나의 탐험 여권</h2>
+    <div style="font-size:.9rem;color:#666" id="pass-summary"></div>
+    <h3 style="margin-top:14px">🎖️ 탐험 배지</h3>
+    <div class="badge-shelf" id="badge-shelf"></div>
+    <h3>🌏 탐험한 나라 (클릭하면 다시 볼 수 있어요)</h3>
+    <div class="pass-list" id="pass-list"></div>
+  </div>
+</div>
+
+<!-- RANK -->
+<div class="screen" id="screen-rank">
+  <div class="back-row"><button class="btn ghost small" onclick="showScreen('home')">← 홈으로</button></div>
+  <div class="panel">
+    <h2>🏆 우리 반 탐험가 랭킹 TOP 10</h2>
+    <table class="rank"><thead><tr><th>순위</th><th>탐험가</th><th>레벨</th><th>XP</th><th>탐험 국가</th></tr></thead>
+    <tbody id="rank-body"><tr><td colspan="5">불러오는 중...</td></tr></tbody></table>
+  </div>
+</div>
+
+<!-- INFO MODAL -->
+<div class="modal-bg" id="modal-info">
+  <div class="modal">
+    <div class="flagline" id="mi-flag">🏳️</div>
+    <h2 id="mi-name">나라</h2>
+    <div class="en" id="mi-en"></div>
+    <div id="mi-xp"></div>
+    <div class="tabs">
+      <button class="tab on" data-tab="basic" onclick="switchTab('basic')">📌 기본 정보</button>
+      <button class="tab" data-tab="life" onclick="switchTab('life')">🍚 의식주</button>
+      <button class="tab" data-tab="culture" onclick="switchTab('culture')">🎭 문화·재미</button>
+    </div>
+    <div class="tabpanel" id="mi-panel"></div>
+    <div class="note-area">
+      <div class="jua" style="margin-bottom:6px">✏️ 나의 탐험 일지 <span style="font-size:.8rem;color:#888;font-family:'Gowun Dodum'">— 새로 알게 된 점을 한 줄로!</span></div>
+      <textarea id="mi-note" placeholder="예) 이 나라 사람들은 쌀국수를 즐겨 먹는다!"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn teal" onclick="saveNoteAndClose()">일지 저장하고 계속 ▶</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="levelup"><div class="box" id="levelup-box"></div></div>
+<script>
+/* ================= 데이터 ================= */
+const CONTINENTS = [
+  {key:'asia', name:'아시아', emoji:'🐼', badge:'🐉', desc:'세계에서 가장 크고 인구가 많은 대륙'},
+  {key:'europe', name:'유럽', emoji:'🏰', badge:'🗼', desc:'다양한 역사와 문화가 살아있는 대륙'},
+  {key:'africa', name:'아프리카', emoji:'🦁', badge:'🌍', desc:'사막·초원·정글이 펼쳐진 생명의 대륙'},
+  {key:'namerica', name:'북아메리카', emoji:'🗽', badge:'🦅', desc:'북극에서 열대까지 이어진 대륙'},
+  {key:'samerica', name:'남아메리카', emoji:'🦜', badge:'⚽', desc:'아마존과 안데스산맥의 대륙'},
+  {key:'oceania', name:'오세아니아', emoji:'🦘', badge:'🏝️', desc:'푸른 바다 위 섬나라들의 대륙'},
+];
+const TIERS = [
+  {tier:1, name:'초급 탐험', emoji:'🥉', desc:'유명한 큰 나라부터 찾아보아요', xp:10},
+  {tier:2, name:'중급 탐험', emoji:'🥈', desc:'조금 더 어려운 나라에 도전!', xp:20},
+  {tier:3, name:'고급 탐험', emoji:'🥇', desc:'진짜 탐험가만 아는 나라들!', xp:30},
+];
+/* id = ISO 3166-1 숫자코드(세계지도 데이터와 연결) */
+const COUNTRIES = [
+/* ---------- 아시아 ---------- */
+{id:'410',cont:'asia',tier:1,flag:'🇰🇷',n:'대한민국',en:'South Korea',cap:'서울',pop:'약 5,100만 명',loc:'아시아 동쪽 끝, 삼면이 바다로 둘러싸인 반도 국가',food:'밥과 김치, 된장찌개 등 발효 음식이 발달',cloth:'전통 옷은 한복, 명절에 입어요',house:'전통 가옥은 온돌이 있는 한옥',cul:'K-팝과 드라마 등 한류 문화가 세계로 퍼지고 있어요',fact:'세계에서 인터넷 속도가 가장 빠른 나라 중 하나예요!'},
+{id:'156',cont:'asia',tier:1,flag:'🇨🇳',n:'중국',en:'China',cap:'베이징',pop:'약 14억 명',loc:'아시아 동부, 세계에서 4번째로 넓은 나라',food:'지역마다 다른 요리 문화, 만두·볶음밥·훠궈',cloth:'전통 옷은 치파오와 한푸',house:'전통 가옥으로 사합원(마당을 둘러싼 집)이 유명',cul:'한자, 경극, 서예 등 오랜 역사의 문화',fact:'만리장성의 길이는 무려 2만 km가 넘어요!'},
+{id:'392',cont:'asia',tier:1,flag:'🇯🇵',n:'일본',en:'Japan',cap:'도쿄',pop:'약 1억 2,300만 명',loc:'아시아 동쪽 바다 위 4개의 큰 섬으로 이루어진 나라',food:'초밥(스시), 라멘, 우동이 유명',cloth:'전통 옷은 기모노',house:'다다미(짚으로 만든 바닥)를 깐 전통 집',cul:'애니메이션과 만화 산업이 세계 최고 수준',fact:'지진이 잦아 건물을 흔들림에 강하게 지어요.'},
+{id:'356',cont:'asia',tier:1,flag:'🇮🇳',n:'인도',en:'India',cap:'뉴델리',pop:'약 14억 3천만 명',loc:'남아시아의 큰 반도, 세계에서 인구가 가장 많은 나라',food:'커리와 난, 향신료를 많이 사용',cloth:'여성 전통 옷 사리, 남성은 도티',house:'더운 날씨에 맞춘 흙집과 평평한 지붕 집',cul:'힌두교·불교가 시작된 곳, 영화 산업 발리우드',fact:'타지마할은 왕비를 위해 지은 아름다운 건축물이에요.'},
+{id:'704',cont:'asia',tier:1,flag:'🇻🇳',n:'베트남',en:'Vietnam',cap:'하노이',pop:'약 1억 명',loc:'동남아시아, 남북으로 길게 뻗은 나라',food:'쌀국수(포)와 반미 샌드위치',cloth:'전통 옷은 아오자이, 원뿔 모자 논라',house:'강 위에 지은 수상 가옥도 있어요',cul:'오토바이가 주요 교통수단인 활기찬 나라',fact:'세계 2위의 커피 수출 국가예요!'},
+{id:'764',cont:'asia',tier:1,flag:'🇹🇭',n:'태국',en:'Thailand',cap:'방콕',pop:'약 7,200만 명',loc:'동남아시아 중앙, 코끼리 모양을 닮은 나라',food:'똠얌꿍, 팟타이 등 새콤달콤 매콤한 요리',cloth:'전통 옷은 화려한 비단으로 만든 춧타이',house:'더위와 홍수를 피해 기둥 위에 지은 집',cul:'국민 대부분이 불교를 믿어 사원이 많아요',cul2:'',fact:'태국은 한 번도 다른 나라의 식민지가 된 적이 없어요.'},
+{id:'360',cont:'asia',tier:1,flag:'🇮🇩',n:'인도네시아',en:'Indonesia',cap:'자카르타',pop:'약 2억 8천만 명',loc:'적도에 걸쳐 있는 세계 최대의 섬나라(약 1만 7천 개 섬)',food:'나시고렝(볶음밥), 사테(꼬치구이)',cloth:'전통 천 바틱은 유네스코 문화유산',house:'습기를 피하려 바닥을 높인 전통 가옥',cul:'세계에서 이슬람교 신자가 가장 많은 나라',fact:'화산이 120개가 넘는 ‘불의 고리’ 위에 있어요.'},
+{id:'608',cont:'asia',tier:1,flag:'🇵🇭',n:'필리핀',en:'Philippines',cap:'마닐라',pop:'약 1억 1,700만 명',loc:'동남아시아 바다 위 7,000여 개의 섬나라',food:'아도보(간장 조림), 할로할로(빙수)',cloth:'파인애플 섬유로 만든 전통 셔츠 바롱',house:'대나무와 야자잎으로 지은 바하이 쿠보',cul:'노래와 춤을 사랑하는 밝은 국민성',fact:'지프니라는 알록달록한 버스가 다녀요!'},
+{id:'682',cont:'asia',tier:1,flag:'🇸🇦',n:'사우디아라비아',en:'Saudi Arabia',cap:'리야드',pop:'약 3,600만 명',loc:'서아시아 아라비아반도의 대부분을 차지하는 사막 나라',food:'대추야자와 향신료 밥 요리 캅사',cloth:'더위와 모래를 막는 긴 옷 토브와 머리덮개',house:'두꺼운 흙벽으로 더위를 막는 집',cul:'이슬람교의 성지 메카가 있는 나라',fact:'국토 대부분이 사막이라 강이 하나도 없어요!'},
+{id:'792',cont:'asia',tier:1,flag:'🇹🇷',n:'튀르키예',en:'Türkiye',cap:'앙카라',pop:'약 8,500만 명',loc:'아시아와 유럽에 걸쳐 있는 다리 같은 나라',food:'케밥과 쫀득한 아이스크림 돈두르마',cloth:'전통 모자 페스, 화려한 자수 옷',house:'카파도키아에는 바위를 파서 만든 동굴집이 있어요',cul:'동양과 서양 문화가 섞인 독특한 매력',fact:'튀르키예는 한국전쟁 때 우리를 도운 ‘형제의 나라’예요.'},
+{id:'496',cont:'asia',tier:2,flag:'🇲🇳',n:'몽골',en:'Mongolia',cap:'울란바토르',pop:'약 340만 명',loc:'중국과 러시아 사이 넓은 초원의 나라',food:'양고기 요리 허르헉, 말젖 음료 아이락',cloth:'전통 옷 델(추위를 막는 긴 겉옷)',house:'이동식 천막집 게르에서 살아요',cul:'말타기·활쏘기·씨름 축제 나담이 유명',fact:'칭기즈칸이 세운 몽골제국은 역사상 가장 넓은 제국이었어요.'},
+{id:'398',cont:'asia',tier:2,flag:'🇰🇿',n:'카자흐스탄',en:'Kazakhstan',cap:'아스타나',pop:'약 2,000만 명',loc:'중앙아시아, 세계에서 가장 큰 내륙국',food:'말고기와 국수 요리 베쉬바르막',cloth:'자수를 놓은 전통 겉옷 샤판',house:'초원의 이동식 집 유르트',cul:'유목민의 전통과 현대 도시가 공존',fact:'세계 최초의 우주 발사 기지(바이코누르)가 있어요.'},
+{id:'364',cont:'asia',tier:2,flag:'🇮🇷',n:'이란',en:'Iran',cap:'테헤란',pop:'약 8,900만 명',loc:'서아시아 고원 지대의 나라(옛 이름 페르시아)',food:'향긋한 사프란 밥과 케밥',cloth:'여성은 머리를 가리는 히잡을 써요',house:'더위를 식히는 바람탑이 있는 흙집',cul:'페르시아 양탄자와 시(詩)의 나라',fact:'페르시아 고양이의 고향이에요!'},
+{id:'368',cont:'asia',tier:2,flag:'🇮🇶',n:'이라크',en:'Iraq',cap:'바그다드',pop:'약 4,500만 명',loc:'서아시아, 티그리스강과 유프라테스강 사이',food:'구운 생선 요리 마스구프',cloth:'헐렁한 긴 옷과 머리 두건',house:'갈대로 지은 전통 수상 가옥(습지 지역)',cul:'세계에서 가장 오래된 문명(메소포타미아)의 땅',fact:'인류 최초의 문자(쐐기문자)가 이곳에서 태어났어요.'},
+{id:'586',cont:'asia',tier:2,flag:'🇵🇰',n:'파키스탄',en:'Pakistan',cap:'이슬라마바드',pop:'약 2억 4천만 명',loc:'남아시아, 인도의 서쪽 이웃 나라',food:'비리아니(향신료 밥)와 난',cloth:'남녀 모두 입는 헐렁한 옷 샬와르 카미즈',house:'흙벽돌로 지은 시원한 집',cul:'크리켓이 국민 스포츠',fact:'세계에서 2번째로 높은 산 K2가 있어요.'},
+{id:'050',cont:'asia',tier:2,flag:'🇧🇩',n:'방글라데시',en:'Bangladesh',cap:'다카',pop:'약 1억 7천만 명',loc:'남아시아, 갠지스강 하류의 낮은 평야 나라',food:'생선 커리와 쌀밥(강과 물고기의 나라)',cloth:'여성은 사리, 남성은 룽기(치마 모양 옷)',house:'홍수에 대비해 높이 올린 집',cul:'세계 최대의 옷 생산 국가 중 하나',fact:'국토 대부분이 해발 10m보다 낮아요.'},
+{id:'458',cont:'asia',tier:2,flag:'🇲🇾',n:'말레이시아',en:'Malaysia',cap:'쿠알라룸푸르',pop:'약 3,400만 명',loc:'동남아시아, 반도와 보르네오섬에 걸친 나라',food:'코코넛밥 나시르막, 국수 락사',cloth:'전통 옷 바주 믈라유와 바주 쿠룽',house:'기둥 위에 올린 나무집 캄풍 하우스',cul:'말레이·중국·인도 문화가 어우러진 다문화 국가',fact:'쌍둥이 빌딩 페트로나스 타워가 유명해요.'},
+{id:'104',cont:'asia',tier:2,flag:'🇲🇲',n:'미얀마',en:'Myanmar',cap:'네피도',pop:'약 5,400만 명',loc:'동남아시아 서쪽, 인도양에 접한 나라',food:'국수 샐러드 같은 모힝가',cloth:'남녀 모두 치마 모양 론지를 입어요',house:'티크 나무로 지은 전통 가옥',cul:'황금빛 불교 사원(파고다)이 가득한 나라',fact:'얼굴에 타나카라는 천연 화장품을 발라요.'},
+{id:'860',cont:'asia',tier:3,flag:'🇺🇿',n:'우즈베키스탄',en:'Uzbekistan',cap:'타슈켄트',pop:'약 3,600만 명',loc:'중앙아시아, 옛 실크로드의 중심지',food:'볶음밥의 조상 필라프(플로프)',cloth:'화려한 무늬의 전통 겉옷 차판',house:'마당을 둘러싼 흙벽돌집',cul:'사마르칸트 등 실크로드 도시로 유명',fact:'우리나라처럼 손님에게 차를 대접하는 문화가 있어요.'},
+{id:'524',cont:'asia',tier:3,flag:'🇳🇵',n:'네팔',en:'Nepal',cap:'카트만두',pop:'약 3,000만 명',loc:'히말라야산맥 남쪽 기슭의 산악 국가',food:'렌틸콩 수프와 밥 달바트, 만두 모모',cloth:'남성 전통 모자 토피',house:'산비탈에 돌과 나무로 지은 집',cul:'세계에서 유일하게 사각형이 아닌 국기를 써요',fact:'세계 최고봉 에베레스트산(8,849m)이 있어요!'},
+{id:'144',cont:'asia',tier:3,flag:'🇱🇰',n:'스리랑카',en:'Sri Lanka',cap:'스리자야와르데네푸라코테',pop:'약 2,200만 명',loc:'인도 아래 눈물방울 모양의 섬나라',food:'코코넛 커리와 호퍼(그릇 모양 팬케이크)',cloth:'사리와 사롱',house:'야자잎 지붕의 시원한 집',cul:'실론티(홍차)의 고향',fact:'섬 모양 때문에 ‘인도양의 진주’라고 불려요.'},
+{id:'116',cont:'asia',tier:3,flag:'🇰🇭',n:'캄보디아',en:'Cambodia',cap:'프놈펜',pop:'약 1,700만 명',loc:'동남아시아, 메콩강이 흐르는 나라',food:'생선 커리 아목, 쌀국수',cloth:'체크무늬 스카프 크라마',house:'우기 홍수에 대비한 높은 기둥 집',cul:'세계 최대 사원 앙코르와트가 있어요',fact:'앙코르와트는 국기에도 그려져 있어요!'},
+{id:'418',cont:'asia',tier:3,flag:'🇱🇦',n:'라오스',en:'Laos',cap:'비엔티안',pop:'약 760만 명',loc:'동남아시아에서 유일하게 바다가 없는 나라',food:'찹쌀밥과 파파야 샐러드 땀막훙',cloth:'여성 전통 치마 씬',house:'대나무와 나무로 지은 고상 가옥',cul:'느긋하고 평화로운 불교 문화',fact:'‘백만 마리 코끼리의 나라’라는 별명이 있어요.'},
+{id:'376',cont:'asia',tier:3,flag:'🇮🇱',n:'이스라엘',en:'Israel',cap:'예루살렘',pop:'약 980만 명',loc:'서아시아 지중해 동쪽 끝의 작은 나라',food:'병아리콩 요리 후무스와 팔라펠',cloth:'유대교 남성은 작은 모자 키파를 써요',house:'돌로 지은 하얀 집이 많아요',cul:'유대교·기독교·이슬람교의 성지가 모여 있어요',fact:'사해에서는 몸이 둥둥 떠서 가라앉지 않아요!'},
+{id:'400',cont:'asia',tier:3,flag:'🇯🇴',n:'요르단',en:'Jordan',cap:'암만',pop:'약 1,100만 명',loc:'서아시아, 사막과 고대 유적의 나라',food:'요구르트 소스 양고기 밥 만사프',cloth:'빨간 체크무늬 두건 케피예',house:'사막 유목민 베두인의 천막집',cul:'바위를 깎아 만든 고대 도시 페트라가 유명',fact:'페트라는 영화 촬영지로도 자주 나와요.'},
+/* ---------- 유럽 ---------- */
+{id:'826',cont:'europe',tier:1,flag:'🇬🇧',n:'영국',en:'United Kingdom',cap:'런던',pop:'약 6,800만 명',loc:'유럽 서북쪽 섬나라(잉글랜드·스코틀랜드·웨일스·북아일랜드)',food:'피시앤칩스, 오후의 홍차 문화',cloth:'스코틀랜드 전통 치마 킬트',house:'붉은 벽돌의 2층 연립주택',cul:'축구의 종주국, 왕이 있는 나라',fact:'런던의 시계탑 빅벤은 세계에서 가장 유명한 시계예요.'},
+{id:'250',cont:'europe',tier:1,flag:'🇫🇷',n:'프랑스',en:'France',cap:'파리',pop:'약 6,800만 명',loc:'서유럽의 중심, 육각형 모양의 나라',food:'바게트, 크루아상, 치즈와 달팽이 요리',cloth:'세계 패션의 중심지',house:'회색 지붕의 아름다운 파리 아파트',cul:'루브르 박물관 등 예술의 나라',fact:'에펠탑은 원래 20년만 세우려던 임시 건축물이었어요!'},
+{id:'276',cont:'europe',tier:1,flag:'🇩🇪',n:'독일',en:'Germany',cap:'베를린',pop:'약 8,400만 명',loc:'유럽 한가운데 위치한 나라',food:'소시지와 프레첼, 자우어크라우트(양배추 절임)',cloth:'전통 옷 디른들과 가죽바지 레더호젠',house:'나무 뼈대가 보이는 전통 목조 가옥',cul:'자동차·과학 기술이 발달, 음악가 베토벤의 나라',fact:'소시지 종류가 1,500가지가 넘어요!'},
+{id:'380',cont:'europe',tier:1,flag:'🇮🇹',n:'이탈리아',en:'Italy',cap:'로마',pop:'약 5,900만 명',loc:'지중해로 뻗은 장화 모양의 반도 국가',food:'피자와 파스타, 젤라토의 고향',cloth:'세계적인 패션 브랜드의 나라',house:'테라코타(주황색) 지붕의 돌집',cul:'고대 로마 유적과 르네상스 예술',fact:'로마 안에는 세계에서 가장 작은 나라 바티칸이 있어요.'},
+{id:'724',cont:'europe',tier:1,flag:'🇪🇸',n:'스페인',en:'Spain',cap:'마드리드',pop:'약 4,800만 명',loc:'유럽 남서쪽 이베리아반도의 나라',food:'파에야(해산물 볶음밥), 츄러스',cloth:'플라멩코 드레스',house:'하얀 벽에 주황 지붕의 지중해식 집',cul:'플라멩코 춤과 투우, 낮잠 문화 시에스타',fact:'토마토를 던지는 축제 ‘라 토마티나’가 열려요!'},
+{id:'643',cont:'europe',tier:1,flag:'🇷🇺',n:'러시아',en:'Russia',cap:'모스크바',pop:'약 1억 4,400만 명',loc:'유럽과 아시아에 걸친 세계에서 가장 넓은 나라',food:'수프 보르시, 만두 펠메니',cloth:'털모자 우샨카(추위 대비)',house:'통나무로 지은 전통 가옥 이즈바',cul:'발레와 클래식 음악이 발달',fact:'너무 넓어서 시간대가 11개나 있어요!'},
+{id:'528',cont:'europe',tier:1,flag:'🇳🇱',n:'네덜란드',en:'Netherlands',cap:'암스테르담',pop:'약 1,800만 명',loc:'서유럽, 바다보다 낮은 땅이 많은 나라',food:'치즈(하우다)와 팬케이크',cloth:'나무 신발 클롬펀',house:'운하를 따라 늘어선 좁고 높은 집',cul:'풍차와 튤립, 자전거의 나라',fact:'국토의 4분의 1이 바다보다 낮아요.'},
+{id:'756',cont:'europe',tier:1,flag:'🇨🇭',n:'스위스',en:'Switzerland',cap:'베른',pop:'약 890만 명',loc:'알프스산맥에 자리 잡은 산의 나라',food:'치즈를 녹여 찍어 먹는 퐁뒤',cloth:'알프스 목동의 전통 복장',house:'뾰족 지붕의 나무집 샬레',cul:'시계와 초콜릿으로 유명, 영세 중립국',fact:'공용어가 4개(독일어·프랑스어·이탈리아어·로만슈어)나 돼요.'},
+{id:'752',cont:'europe',tier:2,flag:'🇸🇪',n:'스웨덴',en:'Sweden',cap:'스톡홀름',pop:'약 1,050만 명',loc:'북유럽 스칸디나비아반도 동쪽',food:'미트볼과 청어 요리',cloth:'노란 십자가 무늬처럼 밝은 전통 의상',house:'빨간 나무집 팔루레드 하우스',cul:'노벨상 시상식이 열리는 나라',fact:'여름엔 밤에도 해가 지지 않는 백야가 있어요.'},
+{id:'578',cont:'europe',tier:2,flag:'🇳🇴',n:'노르웨이',en:'Norway',cap:'오슬로',pop:'약 550만 명',loc:'북유럽, 빙하가 만든 좁고 깊은 바다 피오르의 나라',food:'연어 요리가 세계적으로 유명',cloth:'전통 자수 옷 부나드',house:'지붕에 잔디를 심은 잔디지붕 집',cul:'바이킹의 후예, 겨울 스포츠 강국',fact:'겨울 하늘에 오로라가 춤을 춰요!'},
+{id:'246',cont:'europe',tier:2,flag:'🇫🇮',n:'핀란드',en:'Finland',cap:'헬싱키',pop:'약 560만 명',loc:'북유럽, 숲과 호수의 나라',food:'호밀빵과 연어 수프',cloth:'따뜻한 모직 옷',house:'집집마다 사우나가 있어요',cul:'교육이 훌륭하기로 유명한 나라',fact:'산타클로스 마을이 있는 나라예요! 🎅'},
+{id:'616',cont:'europe',tier:2,flag:'🇵🇱',n:'폴란드',en:'Poland',cap:'바르샤바',pop:'약 3,700만 명',loc:'중부 유럽의 평야 국가',food:'만두 피에로기, 수프 주렉',cloth:'꽃무늬 자수의 전통 의상',house:'알록달록한 구시가지 건물',cul:'음악가 쇼팽과 과학자 퀴리 부인의 고향',fact:'세계에서 가장 오래된 소금 광산이 있어요.'},
+{id:'300',cont:'europe',tier:2,flag:'🇬🇷',n:'그리스',en:'Greece',cap:'아테네',pop:'약 1,040만 명',loc:'유럽 남동쪽, 지중해의 반도와 섬들',food:'꼬치구이 수블라키, 그릭 요구르트',cloth:'주름 잡힌 전통 치마 푸스타넬라',house:'산토리니의 하얀 벽·파란 지붕 집',cul:'올림픽과 민주주의가 시작된 곳',fact:'그리스 신화의 신들이 올림포스산에 살았다고 해요.'},
+{id:'620',cont:'europe',tier:2,flag:'🇵🇹',n:'포르투갈',en:'Portugal',cap:'리스본',pop:'약 1,040만 명',loc:'유럽 서쪽 끝, 대서양에 접한 나라',food:'에그타르트(파스텔 드 나타)의 고향',cloth:'검은 망토의 전통 학생복',house:'알록달록한 타일(아줄레주)로 꾸민 집',cul:'대항해시대를 연 탐험가들의 나라',fact:'우리나라에 처음 온 유럽인이 포르투갈 사람이었어요.'},
+{id:'040',cont:'europe',tier:2,flag:'🇦🇹',n:'오스트리아',en:'Austria',cap:'빈',pop:'약 910만 명',loc:'중부 유럽 알프스 동쪽의 나라',food:'슈니첼(돈가스 원조), 자허토르테 케이크',cloth:'디른들과 로덴 재킷',house:'알프스 산장 스타일의 집',cul:'모차르트의 고향, 클래식 음악의 수도',fact:'영화 ‘사운드 오브 뮤직’의 배경이에요.'},
+{id:'203',cont:'europe',tier:2,flag:'🇨🇿',n:'체코',en:'Czechia',cap:'프라하',pop:'약 1,080만 명',loc:'중부 유럽의 내륙국',food:'굴라시와 찐빵 크네들리키',cloth:'화려한 자수의 전통 의상 크로이',house:'주황 지붕이 가득한 프라하 구시가지',cul:'인형극(마리오네트)의 나라',fact:'프라하의 천문시계는 600년이 넘었어요!'},
+{id:'348',cont:'europe',tier:3,flag:'🇭🇺',n:'헝가리',en:'Hungary',cap:'부다페스트',pop:'약 960만 명',loc:'중부 유럽, 도나우강이 흐르는 내륙국',food:'파프리카 수프 구야시',cloth:'화려한 자수의 전통 의상',house:'온천 위에 세워진 도시 부다페스트',cul:'루빅큐브를 발명한 나라',fact:'수도 부다페스트는 ‘부다’와 ‘페스트’ 두 도시가 합쳐진 거예요.'},
+{id:'642',cont:'europe',tier:3,flag:'🇷🇴',n:'루마니아',en:'Romania',cap:'부쿠레슈티',pop:'약 1,900만 명',loc:'동유럽, 카르파티아산맥의 나라',food:'양배추쌈 사르말레',cloth:'하얀 블라우스 이에(전통 자수 옷)',house:'뾰족 지붕의 산골 나무집',cul:'드라큘라 전설의 배경 트란실바니아가 있어요',fact:'세계에서 두 번째로 큰 건물(인민궁전)이 있어요.'},
+{id:'100',cont:'europe',tier:3,flag:'🇧🇬',n:'불가리아',en:'Bulgaria',cap:'소피아',pop:'약 640만 명',loc:'동유럽 발칸반도의 나라',food:'요구르트의 나라! 차가운 수프 타라토르',cloth:'장미 자수의 전통 의상',house:'돌담과 나무로 지은 전통 가옥',cul:'세계 장미 오일의 대부분을 생산',fact:'고개를 끄덕이면 ‘아니오’, 저으면 ‘네’라는 뜻이에요!'},
+{id:'208',cont:'europe',tier:3,flag:'🇩🇰',n:'덴마크',en:'Denmark',cap:'코펜하겐',pop:'약 590만 명',loc:'북유럽, 반도와 400여 개 섬의 나라',food:'오픈 샌드위치 스뫼레브뢰',cloth:'실용적인 북유럽 스타일',house:'알록달록한 항구의 집들(뉘하운)',cul:'레고와 안데르센 동화의 고향',fact:'인어공주 동상이 코펜하겐 바닷가에 있어요.'},
+{id:'372',cont:'europe',tier:3,flag:'🇮🇪',n:'아일랜드',en:'Ireland',cap:'더블린',pop:'약 530만 명',loc:'영국 서쪽의 초록빛 섬나라',food:'감자 요리와 아이리시 스튜',cloth:'아란 스웨터(어부의 털옷)',house:'초가지붕의 시골 오두막',cul:'전통 춤 리버댄스와 켈트 문화',fact:'‘에메랄드 섬’이라 불릴 만큼 온 나라가 초록색이에요.'},
+{id:'804',cont:'europe',tier:3,flag:'🇺🇦',n:'우크라이나',en:'Ukraine',cap:'키이우',pop:'약 3,700만 명',loc:'동유럽의 넓은 평야 국가',food:'빨간 수프 보르시, 만두 바레니키',cloth:'자수 셔츠 비시반카',house:'하얀 벽에 짚 지붕을 얹은 전통 가옥',cul:'‘유럽의 빵바구니’라 불리는 밀 생산국',fact:'국기의 파랑은 하늘, 노랑은 밀밭을 뜻해요.'},
+{id:'191',cont:'europe',tier:3,flag:'🇭🇷',n:'크로아티아',en:'Croatia',cap:'자그레브',pop:'약 380만 명',loc:'아드리아해를 따라 길게 뻗은 나라',food:'해산물 요리와 트러플',cloth:'넥타이가 처음 생긴 나라!',house:'주황 지붕의 성곽 도시 두브로브니크',cul:'아름다운 해안과 국립공원으로 유명',fact:'달마시안 강아지의 고향(달마티아 지방)이에요.'},
+{id:'688',cont:'europe',tier:3,flag:'🇷🇸',n:'세르비아',en:'Serbia',cap:'베오그라드',pop:'약 660만 명',loc:'발칸반도 한가운데의 내륙국',food:'고기 요리 체밥치치',cloth:'전통 모자 샤이카차',house:'발칸 전통 가옥',cul:'테니스 스타 조코비치의 나라',fact:'라즈베리(산딸기)를 세계에서 가장 많이 수출하는 나라 중 하나예요.'},
+/* ---------- 아프리카 ---------- */
+{id:'818',cont:'africa',tier:1,flag:'🇪🇬',n:'이집트',en:'Egypt',cap:'카이로',pop:'약 1억 1천만 명',loc:'아프리카 북동쪽, 나일강이 흐르는 사막 나라',food:'콩 요리 쿠샤리와 풀',cloth:'헐렁한 긴 옷 갈라베야',house:'더위를 막는 두꺼운 흙벽돌집',cul:'피라미드와 스핑크스, 고대 문명의 나라',fact:'나일강은 세계에서 가장 긴 강이에요(약 6,650km).'},
+{id:'710',cont:'africa',tier:1,flag:'🇿🇦',n:'남아프리카공화국',en:'South Africa',cap:'프리토리아',pop:'약 6,000만 명',loc:'아프리카 대륙 가장 남쪽 끝',food:'말린 고기 빌통, 바비큐 브라이',cloth:'무지개처럼 다양한 민족의 전통 의상',house:'줄루족의 둥근 벌집 모양 집',cul:'‘무지개 나라’라 불리는 다민족 국가',fact:'수도가 3개(행정·입법·사법)나 있는 특이한 나라예요!'},
+{id:'566',cont:'africa',tier:1,flag:'🇳🇬',n:'나이지리아',en:'Nigeria',cap:'아부자',pop:'약 2억 2천만 명',loc:'서아프리카, 아프리카에서 인구가 가장 많은 나라',food:'매콤한 볶음밥 졸로프 라이스',cloth:'화려한 무늬의 전통 옷 아그바다',house:'진흙과 짚으로 지은 전통 가옥',cul:'영화 산업 ‘놀리우드’가 유명',fact:'500개가 넘는 언어가 사용돼요!'},
+{id:'404',cont:'africa',tier:1,flag:'🇰🇪',n:'케냐',en:'Kenya',cap:'나이로비',pop:'약 5,500만 명',loc:'동아프리카, 적도가 지나는 초원의 나라',food:'옥수수 반죽 우갈리, 구운 고기 냐마초마',cloth:'마사이족의 빨간 천 슈카',house:'마사이족의 흙과 나뭇가지 집',cul:'사자·코끼리를 보는 사파리 여행지',fact:'마라톤 세계 최강 선수들이 많은 나라예요!'},
+{id:'504',cont:'africa',tier:1,flag:'🇲🇦',n:'모로코',en:'Morocco',cap:'라바트',pop:'약 3,700만 명',loc:'아프리카 북서쪽 끝, 유럽과 마주 보는 나라',food:'찜 요리 타진과 쿠스쿠스',cloth:'모자 달린 긴 옷 젤라바',house:'중정이 있는 전통 집 리아드',cul:'파란 도시 셰프샤우엔과 시장(수크) 문화',fact:'스페인과의 거리가 겨우 14km예요!'},
+{id:'231',cont:'africa',tier:1,flag:'🇪🇹',n:'에티오피아',en:'Ethiopia',cap:'아디스아바바',pop:'약 1억 2천만 명',loc:'동아프리카 고원의 나라',food:'시큼한 빵 인제라에 반찬을 얹어 먹어요',cloth:'하얀 면 옷 하베샤 케미스',house:'둥근 초가집 투쿨',cul:'커피가 처음 발견된 나라!',fact:'한국전쟁 때 군대를 보내 우리를 도와준 나라예요.'},
+{id:'012',cont:'africa',tier:2,flag:'🇩🇿',n:'알제리',en:'Algeria',cap:'알제',pop:'약 4,500만 명',loc:'북아프리카, 아프리카에서 가장 넓은 나라',food:'쿠스쿠스와 수프 초르바',cloth:'하얀 전통 겉옷 부르누스',house:'사하라의 흙집, 지중해의 하얀 집',cul:'국토의 80%가 사하라 사막',fact:'아프리카에서 면적이 1위인 나라예요.'},
+{id:'288',cont:'africa',tier:2,flag:'🇬🇭',n:'가나',en:'Ghana',cap:'아크라',pop:'약 3,400만 명',loc:'서아프리카 기니만 연안',food:'발효 옥수수 반죽 켄케이, 졸로프',cloth:'알록달록한 전통 천 켄테',house:'흙벽에 그림을 그린 전통 가옥',cul:'카카오(초콜릿 원료) 생산 대국',fact:'우리가 먹는 초콜릿의 카카오가 많이 나는 곳이에요!'},
+{id:'834',cont:'africa',tier:2,flag:'🇹🇿',n:'탄자니아',en:'Tanzania',cap:'도도마',pop:'약 6,500만 명',loc:'동아프리카, 세렝게티 초원의 나라',food:'우갈리와 바비큐 미시카키',cloth:'화려한 천 캉가를 둘러 입어요',house:'초원의 둥근 흙집',cul:'수백만 마리 동물의 대이동을 볼 수 있어요',fact:'아프리카에서 가장 높은 킬리만자로산(5,895m)이 있어요.'},
+{id:'729',cont:'africa',tier:2,flag:'🇸🇩',n:'수단',en:'Sudan',cap:'하르툼',pop:'약 4,800만 명',loc:'북동 아프리카, 나일강이 합쳐지는 곳',food:'콩 스튜 풀과 납작빵',cloth:'하얀 긴 옷 잘라비야, 여성은 토브',house:'평평한 지붕의 흙벽돌집',cul:'고대 누비아 문명의 땅',fact:'이집트보다 피라미드가 더 많은 나라예요!'},
+{id:'434',cont:'africa',tier:2,flag:'🇱🇾',n:'리비아',en:'Libya',cap:'트리폴리',pop:'약 690만 명',loc:'북아프리카 지중해 연안, 사하라 사막의 나라',food:'파스타와 쿠스쿠스(이탈리아의 영향)',cloth:'하얀 전통 겉옷과 조끼',house:'사막 동굴집과 하얀 지중해식 집',cul:'고대 로마 유적이 많이 남아 있어요',fact:'세계에서 가장 더운 기온이 기록된 적 있는 지역이에요.'},
+{id:'450',cont:'africa',tier:2,flag:'🇲🇬',n:'마다가스카르',en:'Madagascar',cap:'안타나나리보',pop:'약 3,000만 명',loc:'아프리카 동쪽 인도양의 큰 섬나라',food:'쌀밥과 고기 스튜 로마자바',cloth:'천을 둘러 입는 람바',house:'붉은 흙벽돌의 2층집',cul:'바오바브나무 거리로 유명',fact:'여우원숭이(리머)는 이 섬에만 살아요!'},
+{id:'180',cont:'africa',tier:3,flag:'🇨🇩',n:'콩고민주공화국',en:'DR Congo',cap:'킨샤사',pop:'약 1억 명',loc:'중앙아프리카, 콩고강과 열대우림의 나라',food:'카사바 반죽 푸푸',cloth:'화려한 무늬 천 파뉴',house:'열대우림의 나무집',cul:'아프리카에서 2번째로 넓은 나라',fact:'세계에서 두 번째로 큰 열대우림이 있어요.'},
+{id:'120',cont:'africa',tier:3,flag:'🇨🇲',n:'카메룬',en:'Cameroon',cap:'야운데',pop:'약 2,800만 명',loc:'중앙아프리카, ‘아프리카의 축소판’이라 불려요',food:'견과류 소스 은돌레',cloth:'화려한 전통 의상 토구',house:'무스굼족의 조개 모양 흙집',cul:'축구를 사랑하는 나라(불굴의 사자들)',fact:'사막·초원·정글·바다가 모두 있는 나라예요.'},
+{id:'686',cont:'africa',tier:3,flag:'🇸🇳',n:'세네갈',en:'Senegal',cap:'다카르',pop:'약 1,800만 명',loc:'아프리카 대륙 가장 서쪽 끝',food:'생선 볶음밥 체부젠',cloth:'헐렁한 전통 옷 부부',house:'바오바브나무 아래 둥근 초가집',cul:'전통 씨름 람브가 국민 스포츠',fact:'2002년 월드컵에서 우리나라와 함께 돌풍을 일으켰어요.'},
+{id:'716',cont:'africa',tier:3,flag:'🇿🇼',n:'짐바브웨',en:'Zimbabwe',cap:'하라레',pop:'약 1,600만 명',loc:'남부 아프리카의 내륙국',food:'옥수수 반죽 사자',cloth:'은데벨레족의 기하학 무늬 옷',house:'둥근 흙집 론다벨',cul:'거대한 돌 유적 그레이트 짐바브웨',fact:'세계 3대 폭포인 빅토리아 폭포가 있어요!'},
+{id:'024',cont:'africa',tier:3,flag:'🇦🇴',n:'앙골라',en:'Angola',cap:'루안다',pop:'약 3,600만 명',loc:'아프리카 남서쪽 대서양 연안',food:'닭고기 스튜 무암바',cloth:'화려한 천 파누',house:'해안 도시의 현대식 건물과 전통 흙집',cul:'춤 킴두쿠와 음악이 발달',fact:'브라질처럼 포르투갈어를 쓰는 나라예요.'},
+{id:'788',cont:'africa',tier:3,flag:'🇹🇳',n:'튀니지',en:'Tunisia',cap:'튀니스',pop:'약 1,200만 명',loc:'북아프리카 지중해 연안의 작은 나라',food:'매운 고추장 하리사와 쿠스쿠스',cloth:'전통 모자 셰시아',house:'파란 문의 하얀 집(시디 부 사이드)',cul:'고대 카르타고 문명의 땅',fact:'영화 스타워즈 행성 ‘타투인’의 촬영지예요!'},
+/* ---------- 북아메리카 ---------- */
+{id:'840',cont:'namerica',tier:1,flag:'🇺🇸',n:'미국',en:'United States',cap:'워싱턴 D.C.',pop:'약 3억 4천만 명',loc:'북아메리카 중앙, 세계 3위로 넓은 나라',food:'햄버거, 핫도그, 바비큐',cloth:'청바지가 처음 만들어진 나라',house:'마당이 있는 넓은 단독주택',cul:'할리우드 영화와 NBA·MLB 스포츠',fact:'50개의 주(州)가 모여 하나의 나라를 이뤄요.'},
+{id:'124',cont:'namerica',tier:1,flag:'🇨🇦',n:'캐나다',en:'Canada',cap:'오타와',pop:'약 4,000만 명',loc:'북아메리카 북쪽, 세계에서 2번째로 넓은 나라',food:'메이플시럽 와플, 감자튀김 푸틴',cloth:'따뜻한 패딩과 체크무늬 셔츠',house:'통나무집과 눈에 강한 뾰족 지붕 집',cul:'아이스하키가 국민 스포츠',fact:'호수가 200만 개가 넘어요! 국기엔 단풍잎이 그려져 있어요.'},
+{id:'484',cont:'namerica',tier:1,flag:'🇲🇽',n:'멕시코',en:'Mexico',cap:'멕시코시티',pop:'약 1억 3천만 명',loc:'미국 남쪽, 북아메리카와 중앙아메리카를 잇는 나라',food:'타코, 부리토, 나초의 고향',cloth:'챙 넓은 모자 솜브레로, 판초',house:'알록달록한 벽의 집들',cul:'마야·아즈텍 문명의 땅, 죽은 자의 날 축제',fact:'초콜릿과 옥수수의 원산지예요!'},
+{id:'192',cont:'namerica',tier:2,flag:'🇨🇺',n:'쿠바',en:'Cuba',cap:'아바나',pop:'약 1,100만 명',loc:'카리브해에서 가장 큰 섬나라',food:'콩밥과 돼지고기 요리',cloth:'시원한 셔츠 과야베라',house:'파스텔색 벽의 오래된 저택',cul:'살사 음악과 춤의 고향',fact:'거리에 1950년대 클래식 자동차가 아직 달려요!'},
+{id:'320',cont:'namerica',tier:2,flag:'🇬🇹',n:'과테말라',en:'Guatemala',cap:'과테말라시티',pop:'약 1,800만 명',loc:'중앙아메리카, 화산과 정글의 나라',food:'옥수수 토르티야와 타말레',cloth:'마야 전통 무늬 옷 우이필',house:'화산 기슭의 알록달록한 집',cul:'고대 마야 문명 유적 티칼이 있어요',fact:'걱정을 대신 해준다는 ‘걱정인형’의 고향이에요.'},
+{id:'591',cont:'namerica',tier:2,flag:'🇵🇦',n:'파나마',en:'Panama',cap:'파나마시티',pop:'약 440만 명',loc:'북아메리카와 남아메리카를 잇는 잘록한 땅',food:'닭고기 스튜 산코초',cloth:'전통 드레스 포예라, 파나마모자',house:'해변의 수상 가옥과 도시 고층빌딩',cul:'태평양과 대서양을 잇는 파나마 운하로 유명',fact:'배가 산을 넘어가는 운하가 있어요!'},
+{id:'388',cont:'namerica',tier:3,flag:'🇯🇲',n:'자메이카',en:'Jamaica',cap:'킹스턴',pop:'약 280만 명',loc:'카리브해의 아름다운 섬나라',food:'매콤한 저크 치킨',cloth:'초록·노랑·검정의 밝은 옷차림',house:'알록달록한 나무 판잣집',cul:'레게 음악의 탄생지(밥 말리)',fact:'육상 단거리 최강국! 우사인 볼트의 나라예요.'},
+{id:'188',cont:'namerica',tier:3,flag:'🇨🇷',n:'코스타리카',en:'Costa Rica',cap:'산호세',pop:'약 520만 명',loc:'중앙아메리카, 두 대양 사이의 자연 왕국',food:'콩밥 가요핀토',cloth:'시원하고 밝은 옷차림',house:'열대 우림 속 나무집',cul:'군대가 없는 평화의 나라',fact:'전 세계 생물종의 5%가 이 작은 나라에 살아요!'},
+{id:'340',cont:'namerica',tier:3,flag:'🇭🇳',n:'온두라스',en:'Honduras',cap:'테구시갈파',pop:'약 1,000만 명',loc:'중앙아메리카 카리브해 연안',food:'토르티야에 콩을 얹은 발레아다',cloth:'하얀 면 전통 의상',house:'흙벽돌(어도비) 집',cul:'마야 유적 코판이 있어요',fact:'바다에서 물고기가 비처럼 내렸다는 ‘물고기 비’ 전설이 있어요.'},
+{id:'214',cont:'namerica',tier:3,flag:'🇩🇴',n:'도미니카공화국',en:'Dominican Republic',cap:'산토도밍고',pop:'약 1,100만 명',loc:'카리브해 히스파니올라섬 동쪽',food:'국기 색을 닮은 밥·콩·고기 요리 라 반데라',cloth:'밝고 화려한 카리브 스타일',house:'파스텔색 나무집',cul:'춤 메렝게와 바차타의 고향',fact:'콜럼버스가 아메리카에서 처음 세운 도시가 있어요.'},
+/* ---------- 남아메리카 ---------- */
+{id:'076',cont:'samerica',tier:1,flag:'🇧🇷',n:'브라질',en:'Brazil',cap:'브라질리아',pop:'약 2억 1천만 명',loc:'남아메리카에서 가장 넓은 나라, 아마존의 땅',food:'고기 뷔페 슈하스쿠, 콩 스튜 페이조아다',cloth:'카니발의 화려한 깃털 의상',house:'해변 도시와 열대우림 나무집',cul:'삼바 축제와 축구의 나라',fact:'아마존 열대우림은 ‘지구의 허파’라고 불려요.'},
+{id:'032',cont:'samerica',tier:1,flag:'🇦🇷',n:'아르헨티나',en:'Argentina',cap:'부에노스아이레스',pop:'약 4,600만 명',loc:'남아메리카 남쪽, 팜파스 초원의 나라',food:'소고기 구이 아사도',cloth:'카우보이 가우초의 전통 복장',house:'유럽풍 건물의 도시',cul:'탱고 춤의 탄생지, 축구 영웅 메시의 나라',fact:'세계에서 소고기를 가장 많이 먹는 나라 중 하나예요.'},
+{id:'152',cont:'samerica',tier:1,flag:'🇨🇱',n:'칠레',en:'Chile',cap:'산티아고',pop:'약 2,000만 명',loc:'남아메리카 서쪽 해안을 따라 남북 4,300km로 뻗은 나라',food:'해산물 요리와 옥수수 파이',cloth:'판초와 챙 모자',house:'알록달록한 언덕 도시 발파라이소',cul:'세계에서 가장 길쭉한 나라',fact:'세계에서 가장 건조한 아타카마 사막이 있어요.'},
+{id:'604',cont:'samerica',tier:2,flag:'🇵🇪',n:'페루',en:'Peru',cap:'리마',pop:'약 3,400만 명',loc:'남아메리카 서쪽, 안데스산맥과 아마존의 나라',food:'생선 요리 세비체, 감자의 원산지',cloth:'알파카 털로 짠 판초와 츄요 모자',house:'안데스 고산지대의 돌집',cul:'잉카 문명의 중심지',fact:'공중 도시 마추픽추는 해발 2,430m에 있어요!'},
+{id:'170',cont:'samerica',tier:2,flag:'🇨🇴',n:'콜롬비아',en:'Colombia',cap:'보고타',pop:'약 5,200만 명',loc:'남아메리카 북서쪽, 두 대양에 접한 나라',food:'옥수수빵 아레파, 스튜 아히아코',cloth:'전통 모자 솜브레로 부엘티아오',house:'알록달록한 마을 과타페',cul:'커피와 에메랄드의 나라',fact:'세계에서 새 종류가 가장 많은 나라예요!'},
+{id:'862',cont:'samerica',tier:2,flag:'🇻🇪',n:'베네수엘라',en:'Venezuela',cap:'카라카스',pop:'약 2,800만 명',loc:'남아메리카 북쪽 카리브해 연안',food:'옥수수빵 아레파',cloth:'전통 드레스와 리쿠일리키 정장',house:'카리브해 연안 수상 가옥',cul:'미인대회와 야구를 사랑하는 나라',fact:'세계에서 가장 높은 폭포 앙헬폭포(979m)가 있어요!'},
+{id:'218',cont:'samerica',tier:3,flag:'🇪🇨',n:'에콰도르',en:'Ecuador',cap:'키토',pop:'약 1,800만 명',loc:'이름 그대로 적도(Ecuador)에 걸친 나라',food:'구운 바나나와 세비체',cloth:'중절모와 판초(원주민 전통)',house:'안데스 산속 흙집',cul:'다윈이 연구한 갈라파고스 제도가 있어요',fact:'바나나를 세계에서 가장 많이 수출해요!'},
+{id:'068',cont:'samerica',tier:3,flag:'🇧🇴',n:'볼리비아',en:'Bolivia',cap:'수크레(헌법상)·라파스(행정)',pop:'약 1,200만 명',loc:'남아메리카 중앙의 고원 내륙국',food:'튀김만두 살테냐',cloth:'여성의 중산모와 풍성한 치마 폴레라',house:'고원의 흙벽돌집',cul:'세계에서 가장 높은 곳에 있는 수도(라파스)',fact:'우유니 소금사막은 세상에서 가장 큰 거울이 돼요!'},
+{id:'858',cont:'samerica',tier:3,flag:'🇺🇾',n:'우루과이',en:'Uruguay',cap:'몬테비데오',pop:'약 340만 명',loc:'브라질과 아르헨티나 사이의 작은 나라',food:'고기 구이 아사도와 마테차',cloth:'가우초 전통 복장',house:'해변의 낮은 주택들',cul:'첫 월드컵(1930년) 개최국이자 우승국',fact:'인구보다 소가 3배나 많아요!'},
+{id:'600',cont:'samerica',tier:3,flag:'🇵🇾',n:'파라과이',en:'Paraguay',cap:'아순시온',pop:'약 700만 명',loc:'남아메리카 한가운데의 내륙국',food:'치즈빵 치파, 옥수수 요리 소파 파라과야',cloth:'레이스 직물 냔두티로 만든 옷',house:'넓은 처마의 시골집',cul:'차가운 마테차 테레레를 마셔요',fact:'국기 앞면과 뒷면의 그림이 다른 유일한 나라예요!'},
+/* ---------- 오세아니아 ---------- */
+{id:'036',cont:'oceania',tier:1,flag:'🇦🇺',n:'오스트레일리아(호주)',en:'Australia',cap:'캔버라',pop:'약 2,600만 명',loc:'남반구, 대륙 전체가 하나의 나라',food:'바비큐와 미트파이, 베지마이트',cloth:'챙 넓은 모자와 시원한 옷',house:'마당 넓은 단층집, 더위 막는 베란다',cul:'캥거루·코알라 등 독특한 동물의 천국',fact:'계절이 우리나라와 반대! 크리스마스가 여름이에요.'},
+{id:'554',cont:'oceania',tier:1,flag:'🇳🇿',n:'뉴질랜드',en:'New Zealand',cap:'웰링턴',pop:'약 520만 명',loc:'호주 남동쪽 두 개의 큰 섬나라',food:'양고기 요리와 땅속 찜 요리 항이',cloth:'마오리족의 아마 섬유 전통 옷',house:'마오리족의 조각된 집 와레누이',cul:'마오리족의 하카 춤이 유명',fact:'사람보다 양이 5배나 많아요!'},
+{id:'598',cont:'oceania',tier:2,flag:'🇵🇬',n:'파푸아뉴기니',en:'Papua New Guinea',cap:'포트모르즈비',pop:'약 1,000만 명',loc:'호주 북쪽, 뉴기니섬 동쪽의 나라',food:'땅속 화덕 찜 요리 무무',cloth:'깃털과 조개로 꾸민 전통 장식',house:'정글 속 높은 나무 위의 집',cul:'800개가 넘는 언어가 쓰이는 나라',fact:'세계에서 언어가 가장 많은 나라예요!'},
+{id:'242',cont:'oceania',tier:2,flag:'🇫🇯',n:'피지',en:'Fiji',cap:'수바',pop:'약 90만 명',loc:'남태평양 330여 개 섬으로 이루어진 나라',food:'코코넛 밀크에 절인 생선 코코다',cloth:'꽃무늬 치마 술루',house:'야자잎 지붕의 전통 집 부레',cul:'‘불라!’라는 인사로 유명한 미소의 나라',fact:'날짜변경선이 가까워 세계에서 새해를 빨리 맞는 나라 중 하나예요.'},
+{id:'090',cont:'oceania',tier:3,flag:'🇸🇧',n:'솔로몬제도',en:'Solomon Islands',cap:'호니아라',pop:'약 72만 명',loc:'남태평양의 900여 개 섬나라',food:'토란과 생선 요리',cloth:'조개껍데기 장식의 전통 의상',house:'야자잎으로 엮은 수상 가옥',cul:'조개껍데기를 돈으로 쓰던 전통이 있어요',fact:'바닷속 산호초가 세계에서 가장 아름다운 곳 중 하나예요.'},
+{id:'548',cont:'oceania',tier:3,flag:'🇻🇺',n:'바누아투',en:'Vanuatu',cap:'포트빌라',pop:'약 33만 명',loc:'남태평양 80여 개 화산섬의 나라',food:'국민 요리 랍랍(토란 찜)',cloth:'풀잎 치마와 조개 장식',house:'태풍에 강한 낮은 초가집',cul:'번지점프의 원조 ‘나골’ 의식이 있어요',fact:'‘세계에서 가장 행복한 나라’로 뽑힌 적이 있어요!'},
+];
+const KO_BY_ID = {}; COUNTRIES.forEach(c=>KO_BY_ID[c.id]=c);
+/* 작은 나라(지도에서 찾기 어려운 섬나라)는 클릭 도우미 원 표시 */
+const TINY = new Set(['242','090','548','388','214','192','591','188','340','320','376','400','144','116','756','528','208','203','040','348','191','688','100','620','300','372']);
+</script>
+<script type="module">
+/* ==================================================================
+   ★★★ Firebase 설정 ★★★
+   Firebase 콘솔(https://console.firebase.google.com)에서 프로젝트를 만든 뒤
+   아래 firebaseConfig 안의 값을 본인 프로젝트 값으로 바꿔 주세요.
+   (자세한 방법은 함께 드린 'Firebase 설정 가이드' PDF 참고)
+   값을 바꾸지 않으면 '연습 모드'(이 컴퓨터에만 저장)로 작동합니다.
+   ================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCigWjBgdMZGW9YFlwZqkTpHr7LbQjJHGM",
+  authDomain: "world-explorer-6.firebaseapp.com",
+  projectId: "world-explorer-6",
+  storageBucket: "world-explorer-6.firebasestorage.app",
+  messagingSenderId: "895566463113",
+  appId: "1:895566463113:web:b5fc3afa220b8496d60658"
+};
+/* ================================================================== */
+
+let USE_FIREBASE = !/여기에/.test(firebaseConfig.apiKey);
+let db=null, auth=null, uid=null;
+let fb = {};
+
+async function initFirebase(){
+  if(!USE_FIREBASE){ setStatus('연습 모드: Firebase 설정 전이라 이 컴퓨터에만 저장됩니다.'); return; }
+  try{
+    const appMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const authMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+    const fsMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const app = appMod.initializeApp(firebaseConfig);
+    auth = authMod.getAuth(app); db = fsMod.getFirestore(app);
+    fb = fsMod;
+    const cred = await authMod.signInAnonymously(auth);
+    uid = cred.user.uid;
+    setStatus('서버 연결 완료! 진행 상황이 자동 저장됩니다. ✅');
+    /* 이전 기록 불러오기 */
+    const snap = await fb.getDoc(fb.doc(db,'students',uid));
+    if(snap.exists()){
+      const d = snap.data();
+      P = Object.assign(P, d);
+      document.getElementById('nickname').value = P.nickname||'';
+      if(P.avatar) selectAvatar(P.avatar);
+      setStatus(`어서 와요, ${P.nickname||'탐험가'}님! 이어서 모험할 수 있어요. ✅`);
+    }
+  }catch(e){
+    console.warn('Firebase 연결 실패, 연습 모드로 전환:', e);
+    USE_FIREBASE=false;
+    setStatus('서버 연결에 실패해 연습 모드로 시작합니다. (인터넷/설정 확인)');
+  }
+}
+function setStatus(t){ document.getElementById('login-status').textContent=t; }
+
+/* ---------------- 플레이어 상태 ---------------- */
+let P = { nickname:'', avatar:'🧭', xp:0, explored:{}, badges:[] };
+const AVATARS = ['🧭','🦊','🐯','🐰','🦖','🐧','🦄','👩‍🚀','🕵️','🐢'];
+const TITLES = [[0,'새싹 탐험가'],[3,'견습 탐험가'],[5,'용감한 탐험가'],[7,'세계 여행가'],[10,'대륙 정복자'],[13,'지리 박사'],[16,'전설의 탐험가']];
+function levelOf(xp){ return Math.min(20, Math.floor(Math.sqrt(xp/40))+1); }
+function xpForLevel(l){ return 40*(l-1)*(l-1); }
+function titleOf(lv){ let t=TITLES[0][1]; for(const [minL,name] of TITLES){ if(lv>=minL) t=name; } return t; }
+const SPECIAL_BADGES = [
+  {id:'first', ic:'👣', lb:'첫 발자국', cond:p=>Object.keys(p.explored).length>=1},
+  {id:'ten', ic:'🎒', lb:'10개국 탐험', cond:p=>Object.keys(p.explored).length>=10},
+  {id:'thirty', ic:'🚀', lb:'30개국 탐험', cond:p=>Object.keys(p.explored).length>=30},
+  {id:'sixty', ic:'🌟', lb:'60개국 탐험', cond:p=>Object.keys(p.explored).length>=60},
+  {id:'all', ic:'👑', lb:'세계 정복!', cond:p=>Object.keys(p.explored).length>=COUNTRIES.length},
+];
+function allBadgeDefs(){
+  return SPECIAL_BADGES.concat(CONTINENTS.map(ct=>({
+    id:'cont_'+ct.key, ic:ct.badge, lb:ct.name+' 완주',
+    cond:p=>COUNTRIES.filter(c=>c.cont===ct.key).every(c=>p.explored[c.id])
+  })));
+}
+function checkBadges(){
+  const earned=[];
+  for(const b of allBadgeDefs()){
+    if(b.cond(P) && !P.badges.includes(b.id)){ P.badges.push(b.id); earned.push(b); }
+  }
+  earned.forEach((b,i)=>setTimeout(()=>toast(`🎖️ 배지 획득! ${b.ic} ${b.lb}`),800*i+400));
+}
+
+/* ---------------- 저장 ---------------- */
+let saveTimer=null;
+function saveProfile(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async ()=>{
+    const data = {nickname:P.nickname, avatar:P.avatar, xp:P.xp, level:levelOf(P.xp),
+      explored:P.explored, badges:P.badges, exploredCount:Object.keys(P.explored).length,
+      updatedAt:Date.now()};
+    if(USE_FIREBASE && uid){
+      try{ await fb.setDoc(fb.doc(db,'students',uid), data, {merge:true}); }
+      catch(e){ console.warn('저장 실패', e); }
+    }else{
+      try{ localStorage.setItem('wx_profile', JSON.stringify(data)); }catch(e){}
+    }
+  }, 400);
+}
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem('wx_profile');
+    if(raw){ P=Object.assign(P, JSON.parse(raw));
+      document.getElementById('nickname').value=P.nickname||'';
+      if(P.avatar) selectAvatar(P.avatar);
+    }
+  }catch(e){}
+}
+
+/* ---------------- 화면 전환 ---------------- */
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  if(name==='home') renderHome();
+}
+function toast(msg, ms=2200){
+  const t=document.getElementById('toast'); t.innerHTML=msg; t.classList.add('show');
+  clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'), ms);
+}
+function updateHUD(){
+  const lv=levelOf(P.xp);
+  document.getElementById('hud-avatar').textContent=P.avatar;
+  document.getElementById('hud-name').textContent=P.nickname||'-';
+  document.getElementById('hud-title').textContent=titleOf(lv);
+  document.getElementById('hud-level').textContent='Lv.'+lv;
+  document.getElementById('hud-xp').textContent=P.xp+' XP';
+  const cur=P.xp-xpForLevel(lv), need=xpForLevel(lv+1)-xpForLevel(lv);
+  document.getElementById('hud-xpfill').style.width=Math.min(100, cur/need*100)+'%';
+  document.getElementById('hud-explored').textContent=Object.keys(P.explored).length;
+}
+
+/* ---------------- 로그인 ---------------- */
+let selAvatar='🧭';
+function selectAvatar(a){
+  selAvatar=a;
+  document.querySelectorAll('.avatar-pick').forEach(el=>el.classList.toggle('sel', el.textContent===a));
+}
+function buildAvatars(){
+  const row=document.getElementById('avatar-row');
+  row.innerHTML=AVATARS.map(a=>`<div class="avatar-pick${a===selAvatar?' sel':''}" onclick="selectAvatar('${a}')">${a}</div>`).join('');
+}
+function startAdventure(){
+  const nick=document.getElementById('nickname').value.trim();
+  if(!nick){ toast('탐험가 이름을 입력해 주세요! ✏️'); return; }
+  P.nickname=nick; P.avatar=selAvatar;
+  saveProfile();
+  document.getElementById('hud').classList.add('show');
+  updateHUD();
+  showScreen('home');
+  toast(`${P.avatar} ${nick} 탐험가님, 환영합니다!`);
+}
+
+/* ---------------- 홈(대륙 선택) ---------------- */
+function contProgress(key){
+  const list=COUNTRIES.filter(c=>c.cont===key);
+  const done=list.filter(c=>P.explored[c.id]).length;
+  return {done, total:list.length};
+}
+function renderHome(){
+  updateHUD();
+  const grid=document.getElementById('continent-grid');
+  grid.innerHTML=CONTINENTS.map(ct=>{
+    const p=contProgress(ct.key);
+    const full=p.done===p.total;
+    return `<div class="cont-card" onclick="openStage('${ct.key}')">
+      <div class="cont-badge${full?' earned':''}">${ct.badge}</div>
+      <div class="emoji">${ct.emoji}</div>
+      <h3>${ct.name}</h3>
+      <div class="cnt">${ct.desc}</div>
+      <div class="cont-progress"><div style="width:${p.total?p.done/p.total*100:0}%"></div></div>
+      <div class="cnt" style="margin-top:4px">${p.done} / ${p.total} 개국 탐험 완료</div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------------- 단계(난이도) 선택 ---------------- */
+let curCont=null;
+function tierDone(key,tier){
+  const list=COUNTRIES.filter(c=>c.cont===key&&c.tier===tier);
+  return {done:list.filter(c=>P.explored[c.id]).length, total:list.length};
+}
+function tierUnlocked(key,tier){
+  if(tier===1) return true;
+  const prev=tierDone(key,tier-1);
+  return prev.total===0 || prev.done/prev.total>=0.7; /* 이전 단계 70% 이상 완료 시 해금 */
+}
+function openStage(key){
+  curCont=key;
+  const ct=CONTINENTS.find(c=>c.key===key);
+  document.getElementById('stage-title').textContent=`${ct.emoji} ${ct.name} 탐험 기지`;
+  const row=document.getElementById('tier-row');
+  row.innerHTML=TIERS.map(t=>{
+    const p=tierDone(key,t.tier);
+    if(p.total===0) return '';
+    const un=tierUnlocked(key,t.tier);
+    const chips=COUNTRIES.filter(c=>c.cont===key&&c.tier===t.tier)
+      .map(c=>`<span class="chip${P.explored[c.id]?' done':''}">${P.explored[c.id]?c.flag+' '+c.n:'❓'}</span>`).join('');
+    return `<div class="tier-card${un?'':' locked'}">
+      <h3>${t.emoji} ${t.name} <span style="font-size:.8rem;color:#888">(정답 시 +${t.xp}XP)</span></h3>
+      <div class="desc">${t.desc} · ${p.done}/${p.total} 완료</div>
+      <div style="margin-bottom:10px">${chips}</div>
+      ${un?`<button class="btn teal small" onclick="startQuiz('${key}',${t.tier})">탐험 출발! 🧭</button>`
+          :`<div class="jua" style="color:#999">🔒 이전 단계를 70% 이상 완료하면 열려요</div>`}
+    </div>`;
+  }).join('');
+  showScreen('stage');
+}
+
+/* ---------------- 지도 ---------------- */
+let WORLD=null, mapPath=null, mapSvg=null;
+async function loadWorld(){
+  if(WORLD) return WORLD;
+  const topo = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r=>r.json());
+  WORLD = topojson.feature(topo, topo.objects.countries).features;
+  return WORLD;
+}
+function nameOf(id, feat){
+  if(KO_BY_ID[id]) return KO_BY_ID[id].flag+' '+KO_BY_ID[id].n;
+  return feat && feat.properties && feat.properties.name ? feat.properties.name : '이 나라';
+}
+async function drawMap(contKey){
+  const feats=await loadWorld();
+  const contIds=new Set(COUNTRIES.filter(c=>c.cont===contKey).map(c=>c.id));
+  const contFeats=feats.filter(f=>contIds.has(String(f.id)));
+  const W=940,H=560;
+  const proj=d3.geoNaturalEarth1();
+  proj.fitExtent([[20,20],[W-20,H-20]], {type:'FeatureCollection', features:contFeats});
+  mapPath=d3.geoPath(proj);
+  const wrap=d3.select('#map-wrap'); wrap.selectAll('*').remove();
+  mapSvg=wrap.append('svg').attr('viewBox',`0 0 ${W} ${H}`);
+  mapSvg.append('g').selectAll('path').data(feats).join('path')
+    .attr('d',mapPath)
+    .attr('class',f=>{
+      const id=String(f.id);
+      if(!contIds.has(id)) return 'country dim';
+      return 'country in-cont'+(P.explored[id]?' explored-mark':'');
+    })
+    .attr('data-id',f=>String(f.id))
+    .on('click',(ev,f)=>handleMapClick(String(f.id), f));
+  /* 작은 나라 클릭 도우미 */
+  const g2=mapSvg.append('g');
+  contFeats.filter(f=>TINY.has(String(f.id))).forEach(f=>{
+    const c=mapPath.centroid(f);
+    if(isNaN(c[0])) return;
+    g2.append('circle').attr('class','tiny-target')
+      .attr('cx',c[0]).attr('cy',c[1]).attr('r',13)
+      .attr('data-id',String(f.id))
+      .on('click',()=>handleMapClick(String(f.id), f));
+  });
+}
+
+/* ---------------- 퀴즈 ---------------- */
+let QS=null; /* {list, idx, hearts, wrongs, locked, cont, tier} */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+async function startQuiz(contKey,tier){
+  const all=COUNTRIES.filter(c=>c.cont===contKey&&c.tier===tier);
+  const remain=all.filter(c=>!P.explored[c.id]);
+  const pool=remain.length? remain : all; /* 다 깼으면 복습 */
+  const list=shuffle(pool.slice()).slice(0,8);
+  QS={list, idx:0, hearts:3, wrongs:0, locked:true, cont:contKey, tier, review:remain.length===0};
+  showScreen('quiz');
+  document.getElementById('quiz-feedback').textContent='지도를 불러오는 중... 🛰️';
+  await drawMap(contKey);
+  QS.locked=false;
+  if(QS.review) toast('이미 모두 탐험한 단계예요. 복습 모드로 진행! 📖');
+  nextQuestion(true);
+}
+function nextQuestion(first){
+  if(!QS) return;
+  if(!first) QS.idx++;
+  if(QS.idx>=QS.list.length){ finishQuiz(); return; }
+  QS.hearts=3; QS.wrongs=0; QS.locked=false;
+  const c=QS.list[QS.idx];
+  document.getElementById('quiz-question').innerHTML=`🔎 <b>${c.n}</b> ${josa(c.n)} 지도에서 찾아 클릭하세요!`;
+  document.getElementById('quiz-progress').textContent=(QS.idx+1)+'/'+QS.list.length;
+  document.getElementById('quiz-feedback').textContent='';
+  document.getElementById('quiz-hint').textContent='';
+  renderHearts();
+  mapSvg && mapSvg.selectAll('.country').classed('correct',false).classed('wrongpick',false);
+}
+function josa(w){ /* 을/를 */
+  const code=w.charCodeAt(w.length-1);
+  if(code<0xAC00||code>0xD7A3) return '을(를)';
+  return (code-0xAC00)%28>0 ? '을' : '를';
+}
+function renderHearts(){
+  document.getElementById('hearts').textContent='❤️'.repeat(QS.hearts)+'🖤'.repeat(3-QS.hearts);
+}
+function handleMapClick(id, feat){
+  if(!QS||QS.locked) return;
+  const c=QS.list[QS.idx];
+  if(id===c.id){
+    QS.locked=true;
+    mapSvg.select(`path[data-id="${id}"]`).classed('correct',true);
+    const base=TIERS.find(t=>t.tier===QS.tier).xp;
+    let gain=QS.review?0:Math.max(5, base-5*QS.wrongs);
+    document.getElementById('quiz-feedback').textContent=`🎉 정답! ${c.flag} ${c.n}!`;
+    setTimeout(()=>onCorrect(c, gain), 700);
+  }else{
+    QS.hearts--; QS.wrongs++;
+    renderHearts();
+    const el=mapSvg.select(`path[data-id="${id}"]`);
+    el.classed('wrongpick',true); setTimeout(()=>el.classed('wrongpick',false),600);
+    if(QS.hearts<=0){
+      QS.locked=true;
+      document.getElementById('quiz-feedback').textContent=`아쉬워요! 정답은 여기예요 👇 (다음에 다시 도전!)`;
+      mapSvg.select(`path[data-id="${c.id}"]`).classed('correct',true);
+      setTimeout(()=>openInfo(c, 0, false), 1300);
+    }else{
+      document.getElementById('quiz-feedback').textContent=`앗, 거긴 ${nameOf(id,feat)}! 다시 찾아보세요.`;
+      document.getElementById('quiz-hint').textContent =
+        QS.wrongs===1 ? `💡 힌트: 수도는 ${c.cap}!` : `💡 힌트: ${c.loc}`;
+    }
+  }
+}
+function onCorrect(c, gain){
+  const isNew=!P.explored[c.id];
+  if(!QS.review){
+    P.explored[c.id]=P.explored[c.id]||{note:'',ts:Date.now()};
+    P.explored[c.id].ts=Date.now();
+    addXP(gain);
+  }
+  checkBadges(); saveProfile(); updateHUD();
+  openInfo(c, gain, isNew);
+}
+function addXP(gain){
+  const before=levelOf(P.xp);
+  P.xp+=gain;
+  const after=levelOf(P.xp);
+  if(after>before){
+    const box=document.getElementById('levelup-box');
+    box.innerHTML=`🎊 LEVEL UP! 🎊<br>Lv.${after} ${titleOf(after)}`;
+    const ov=document.getElementById('levelup'); ov.classList.add('show');
+    setTimeout(()=>ov.classList.remove('show'), 2200);
+  }
+}
+function finishQuiz(){
+  toast('🏁 이번 탐험 완료! 수고했어요.');
+  QS=null;
+  openStage(curCont);
+}
+function exitQuiz(){ QS=null; openStage(curCont); }
+
+/* ---------------- 나라 정보 카드 ---------------- */
+let curInfo=null, fromReview=false;
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab===tab));
+  const c=curInfo; if(!c) return;
+  const p=document.getElementById('mi-panel');
+  if(tab==='basic') p.innerHTML=`<dl><dt>📍 위치</dt><dd>${c.loc}</dd><dt>🏛️ 수도</dt><dd>${c.cap}</dd><dt>👨‍👩‍👧‍👦 인구</dt><dd>${c.pop}</dd></dl>`;
+  if(tab==='life') p.innerHTML=`<dl><dt>🍚 식(음식)</dt><dd>${c.food}</dd><dt>👘 의(옷)</dt><dd>${c.cloth}</dd><dt>🏠 주(집)</dt><dd>${c.house}</dd></dl>`;
+  if(tab==='culture') p.innerHTML=`<dl><dt>🎭 문화</dt><dd>${c.cul}</dd><dt>✨ 재미있는 사실</dt><dd>${c.fact}</dd></dl>`;
+}
+function openInfo(c, gain, isNew, review){
+  curInfo=c; fromReview=!!review;
+  document.getElementById('mi-flag').textContent=c.flag;
+  document.getElementById('mi-name').textContent=c.n;
+  document.getElementById('mi-en').textContent=c.en;
+  document.getElementById('mi-xp').innerHTML= gain>0?`<span class="xp-gain">+${gain} XP ${isNew?'· 새로운 나라 발견!':''}</span>`:'';
+  document.getElementById('mi-note').value=(P.explored[c.id]&&P.explored[c.id].note)||'';
+  switchTab('basic');
+  document.getElementById('modal-info').classList.add('show');
+}
+function saveNoteAndClose(){
+  const note=document.getElementById('mi-note').value.trim();
+  if(curInfo && P.explored[curInfo.id]){ P.explored[curInfo.id].note=note; saveProfile(); }
+  document.getElementById('modal-info').classList.remove('show');
+  updateHUD();
+  if(fromReview){ openPassport(); return; }
+  if(QS) nextQuestion();
+}
+
+/* ---------------- 여권 / 랭킹 ---------------- */
+function openPassport(){
+  updateHUD();
+  const n=Object.keys(P.explored).length;
+  document.getElementById('pass-summary').textContent=
+    `${P.avatar} ${P.nickname} · Lv.${levelOf(P.xp)} ${titleOf(levelOf(P.xp))} · 총 ${P.xp} XP · ${n}/${COUNTRIES.length}개국 탐험`;
+  const shelf=document.getElementById('badge-shelf');
+  shelf.innerHTML=allBadgeDefs().map(b=>`<div class="badge-item${P.badges.includes(b.id)?' earned':''}"><div class="ic">${b.ic}</div><div class="lb">${b.lb}</div></div>`).join('');
+  const list=document.getElementById('pass-list');
+  const items=COUNTRIES.filter(c=>P.explored[c.id]);
+  list.innerHTML=items.length? items.map(c=>`<div class="pass-item" onclick="reviewCountry('${c.id}')">
+      <div class="nm">${c.flag} ${c.n}</div>
+      <div class="nt">${(P.explored[c.id].note||'✏️ 일지를 써 보세요')}</div>
+    </div>`).join('') : '<div style="color:#888">아직 탐험한 나라가 없어요. 첫 모험을 떠나 볼까요? 🚀</div>';
+  showScreen('passport');
+}
+function reviewCountry(id){ openInfo(KO_BY_ID[id], 0, false, true); }
+async function openRank(){
+  showScreen('rank');
+  const body=document.getElementById('rank-body');
+  if(!USE_FIREBASE){
+    body.innerHTML=`<tr class="me"><td>-</td><td>${P.avatar} ${P.nickname}</td><td>Lv.${levelOf(P.xp)}</td><td>${P.xp}</td><td>${Object.keys(P.explored).length}</td></tr>
+    <tr><td colspan="5" style="color:#888">연습 모드에서는 내 기록만 보여요. Firebase 연결 시 반 전체 랭킹이 나타나요!</td></tr>`;
+    return;
+  }
+  body.innerHTML='<tr><td colspan="5">불러오는 중...</td></tr>';
+  try{
+    const q=fb.query(fb.collection(db,'students'), fb.orderBy('xp','desc'), fb.limit(10));
+    const snap=await fb.getDocs(q);
+    let rows='', rank=1;
+    snap.forEach(docu=>{
+      const d=docu.data();
+      const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
+      rows+=`<tr${docu.id===uid?' class="me"':''}><td>${medal}</td><td>${d.avatar||'🧭'} ${d.nickname||'?'}</td><td>Lv.${d.level||1}</td><td>${d.xp||0}</td><td>${d.exploredCount||0}</td></tr>`;
+      rank++;
+    });
+    body.innerHTML=rows||'<tr><td colspan="5">아직 기록이 없어요.</td></tr>';
+  }catch(e){
+    body.innerHTML='<tr><td colspan="5">랭킹을 불러오지 못했어요. (Firestore 색인/규칙 확인)</td></tr>';
+  }
+}
+
+/* ---------------- 시작 ---------------- */
+window.showScreen=showScreen; window.selectAvatar=selectAvatar; window.startAdventure=startAdventure;
+window.openStage=openStage; window.startQuiz=startQuiz; window.exitQuiz=exitQuiz;
+window.switchTab=switchTab; window.saveNoteAndClose=saveNoteAndClose;
+window.openPassport=openPassport; window.openRank=openRank; window.reviewCountry=reviewCountry;
+
+buildAvatars();
+if(!USE_FIREBASE) loadLocal();
+initFirebase();
+loadWorld(); /* 미리 불러두기 */
+document.getElementById('nickname').addEventListener('keydown',e=>{ if(e.key==='Enter') startAdventure(); });
+</script>
+</body>
+</html>
